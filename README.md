@@ -5,7 +5,7 @@ Build a real-time bounding-box object detection system for the boat (using fine-
 **Test**
 1. Clone this folder
 2. Download the weights in keras from https://drive.google.com/open?id=1cVWJE1hv1M_KxzyJN6NE52L2JKqjW133
-3. run python3 propagation.py 
+3. Run python3 propagation.py 
 
 
 **Train**
