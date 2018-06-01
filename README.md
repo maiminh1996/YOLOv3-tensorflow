@@ -9,6 +9,8 @@
 
 
 **Results**
+
+
 | YOLOv3-608 | YOLOv3-416 | YOLOv3-320 |
 |------------|------------|------------|
 | <img src="https://drive.google.com/open?id=1_OuvQRqtIeHWpnum_keDgNo3hKsuqQua"> | <img src="https://drive.google.com/open?id=1wILjwPT2GvJH5S74cRI_-4JPlFjIPWiG"> | <img src="https://drive.google.com/open?id=1isyFR0h7mrKN1dKdAFmHvalzIOdevK_k"> |
