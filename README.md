@@ -13,7 +13,7 @@
 
 | YOLOv3-608 | YOLOv3-416 | YOLOv3-320 |
 |------------|------------|------------|
-| ![Imgur](https://i.imgur.com/d6wCvfx.jpg) | ![Imgur](https://i.imgur.com/jL2gnXW.jpg) | ![Imgur](https://i.imgur.com/XlOdq1N.jpg) |
+| ![608](https://i.imgur.com/d6wCvfx.jpg) | ![416](https://i.imgur.com/jL2gnXW.jpg) | ![320](https://i.imgur.com/XlOdq1N.jpg) |
 
 
 **Train**
