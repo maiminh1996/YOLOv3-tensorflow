@@ -37,7 +37,7 @@ def get_training_data(annotation_path, data_path, input_shape, max_boxes=100, lo
     if load_previous==True and os.path.isfile(data_path):
         data = np.load(data_path)
         print('Loading training data from ' + data_path)
-        return data['image_data'], data['box_data']
+        return data['image_data'], data['box_data'], data['image_shape']
     image_data = []
     box_data = []
     image_shape = []
@@ -65,7 +65,7 @@ def get_training_data(annotation_path, data_path, input_shape, max_boxes=100, lo
     image_shape = np.array(image_shape)
     image_data = np.array(image_data)
     box_data = np.array(box_data)
-    np.savez(data_path, image_data=image_data, box_data=box_data)
+    np.savez(data_path, image_data=image_data, box_data=box_data, image_shape=image_shape)
     print('Saving training data into ' + data_path)
     return image_data, box_data, image_shape
 
