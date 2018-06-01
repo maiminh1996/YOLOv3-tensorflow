@@ -13,11 +13,10 @@
 
 | YOLOv3-608 | YOLOv3-416 | YOLOv3-320 |
 |------------|------------|------------|
-| [Imgur](https://i.imgur.com/jL2gnXW.jpg) | <img src="https://drive.google.com/open?id=1wILjwPT2GvJH5S74cRI_-4JPlFjIPWiG"> | <img src="https://drive.google.com/open?id=1isyFR0h7mrKN1dKdAFmHvalzIOdevK_k"> |
+| ![Imgur](https://i.imgur.com/d6wCvfx.jpg) | ![Imgur](https://i.imgur.com/jL2gnXW.jpg) | ![Imgur](https://i.imgur.com/XlOdq1N.jpg) |
 
 
 **Train**
 
-![Imgur](https://i.imgur.com/jL2gnXW.jpg)
 
 
