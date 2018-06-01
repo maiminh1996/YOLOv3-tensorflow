@@ -8,7 +8,7 @@
 3. Run python3 propagation.py 
 
 
-**Results**
+**Results** (La Rochelle, la belle ville :) )
 
 
 | YOLOv3-608 | YOLOv3-416 | YOLOv3-320 |
