@@ -1,6 +1,6 @@
 # CONFIGURE
 # image pré-processing
-Input_shape = 608  # width=height # 416 or 320
+Input_shape = 416  # width=height # 608 or 320
 channels = 3  # RBG
 angle = 0
 saturation = 1.5
