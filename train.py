@@ -62,7 +62,7 @@ with graph.as_default():
     # STEP 2: Building the graph #######################################################################################
     # Building the graph
     # Generate output tensor targets for filtered bounding boxes.
-    scale1, scale2, scale3 = YOLOv3(X, len(classes_paths)).feature_extractor()
+    scale1, scale2, scale3 = YOLOv3(X, len(classes_data)).feature_extractor()
     scale_total = []
     scale_total.append(scale1)
     scale_total.append(scale2)
