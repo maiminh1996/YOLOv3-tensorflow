@@ -14,7 +14,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # Sua lai cho phu hop voi data cua minh#######
 classes_paths = './model_data/boat_classes.txt'  # TODO
 classes_data = read_classes(classes_paths)
-anchors_paths = '/home/minh/stage/model_data/yolo_anchors.txt'
+anchors_paths = './model_data/yolo_anchors.txt'
 anchors = read_anchors(anchors_paths)
 # get data
 annotation_path_train = 'boat_train.txt'
@@ -53,16 +53,16 @@ with graph.as_default():
     # Start running operations on the Graph.
     # STEP 1: Input data ###############################################################################################
     with tf.name_scope("Input"):
-        X = tf.placeholder(tf.float32, shape=[None, 416, 416, 3])  # for image_data
+        X = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, 3])  # for image_data
         S = tf.placeholder(tf.float32, shape=[2, ])  # for image shape
         Y = tf.placeholder(tf.float32, shape=[None, 100, 5])  # for box_data
     # Reshape images for visualization
-    x_reshape = tf.reshape(X, [-1, 416, 416, 1])
+    x_reshape = tf.reshape(X, [-1, Input_shape, Input_shape, 1])
     tf.summary.image("input", x_reshape)
     # STEP 2: Building the graph #######################################################################################
     # Building the graph
     # Generate output tensor targets for filtered bounding boxes.
-    scale1, scale2, scale3 = YOLOv3(X, 80).feature_extractor()
+    scale1, scale2, scale3 = YOLOv3(X, len(classes_paths)).feature_extractor()
     scale_total = []
     scale_total.append(scale1)
     scale_total.append(scale2)
