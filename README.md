@@ -20,11 +20,8 @@
 
 
 1. Run python3 boat_annotation.py to get 3 files: bateau_train.txt, bateau_valid.txt, bateau_test.txt
-
-In each file contains path_to_image obj1 obj2 ...
-
-
-With obj1: x1_min, y1_min, x1_max, y1_max
+1.1 In each file contains path_to_image obj1 obj2 ...
+1.2With obj1: x1_min, y1_min, x1_max, y1_max
 2. Run python3 train.py
 3. Run python3 test.py(propagation) A venir!
 
