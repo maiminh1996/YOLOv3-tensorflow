@@ -10,11 +10,6 @@ def read_xywhi():
     with open('vt_fullInterpolated.json') as json_data:
         d = json.load(json_data)
         json_data.close()
-        Xmin = []
-        Ymin = []
-        Xmax = []
-        Ymax = []
-        Class = []
         bateau_class = read_classes("./model_data/boat_classes.txt")
         ################################################################################################################
         with open('vt_fullInterpolated.json') as json_data:
@@ -60,17 +55,12 @@ def read_xywhi():
                     id = d['frames'][img]['annotations'][obj]['id']  # string
                     type = read_idx(id)
                     index = bateau_class.index(type)
-                    Class.append(index)
                     xmin = d['frames'][img]['annotations'][obj]['x']  # int
-                    Xmin.append(xmin)
                     ymin = d['frames'][img]['annotations'][obj]['y']
-                    Ymin.append(ymin)
                     w = d['frames'][img]['annotations'][obj]['width']
                     h = d['frames'][img]['annotations'][obj]['height']
                     xmax = xmin + w
-                    Xmax.append(xmax)
                     ymax = ymin + h
-                    Ymax.append(ymax)
                     if obj == 0:
                         if d['frames'][img]['num'] in train_num:
                             file_train.write('%s/dataset/%s ' % (wd, image_name))
@@ -100,7 +90,6 @@ def read_xywhi():
         file_train.close()
         file_vali.close()
         file_test.close()
-    return Xmin, Ymin, Xmax, Ymax, Class
 
 
 def read_idx(id):
@@ -118,8 +107,7 @@ def read_classes(classes_path):
     class_names = [c.strip() for c in class_names]
     return class_names
 
-
-a, b, c, d, e = read_xywhi()
+read_xywhi()
 
 print(time.time()-start)
 
