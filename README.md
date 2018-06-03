@@ -24,6 +24,8 @@
   <li>In each file contains path_to_image obj1 obj2 ...</li>
   <li>With obj1: x1_min, y1_min, x1_max, y1_max</li>
   </ul>
+  
+  
 2. Run python3 train.py
 3. Run python3 test.py(propagation) A venir!
 
