@@ -17,14 +17,14 @@ classes_data = read_classes(classes_paths)
 anchors_paths = '/home/minh/stage/model_data/yolo_anchors.txt'
 anchors = read_anchors(anchors_paths)
 # get data
-annotation_path_train = 'bateau_train.txt' 
-annotation_path_valid = 'bateau_valid.txt' 
-annotation_path_test = 'bateau_test.txt' 
+annotation_path_train = 'boat_train.txt'
+annotation_path_valid = 'boat_valid.txt'
+annotation_path_test = 'boat_test.txt'
 
-data_path_train = 'bateau_train.npz'
-data_path_valid = 'bateau_valid.npz'
-data_path_test = 'bateau_test.npz'
-log_dir = 'logs/000/'  # TODO change
+data_path_train = 'boat_train.npz'
+data_path_valid = 'boat_valid.npz'
+data_path_test = 'boat_test.npz'
+
 input_shape = (Input_shape, Input_shape)  # multiple of 32
 image_data_train, box_data_train, image_shape_train = get_training_data(annotation_path_train, data_path_train,
                                                                         input_shape, max_boxes=100, load_previous=True)
@@ -126,12 +126,12 @@ with graph.as_default():
                 print(datetime.now(), "epoch", epoch, "accuracy=", 100*loss_valid, "(", examples_per_sec, "examples/sec;", sec_per_batch, "sec/batch)")
             # Saver the model checkpoint periodically
             if (epoch % 10) == 0:
-                create_new_folder = "/home/minh/stage/saver_model"
+                create_new_folder = "./stage/saver_model"
                 try:
                     os.mkdir(create_new_folder)
                 except OSError:
                     pass
-                checkpoint_path = create_new_folder + "/model.ckpt"  # os.path.join()
+                checkpoint_path = create_new_folder + "/model" + str(epoch) + ".ckpt"
                 saver.save(sess, checkpoint_path, global_step=epoch)
                 print("Model saved in file: %s" % checkpoint_path)
         print("Tuning completed!")
