@@ -32,9 +32,9 @@ def read_xywhi():
         num2 = list(set(num1) - set(valid_num))
         test_num = random.sample(population=num2, k=number_of_testset)
         ################################################################################################################
-        file_train = open('train_boat.txt', 'w')
-        file_vali = open('valid_boat.txt', 'w')
-        file_test = open('test_boat.txt', 'w')
+        file_train = open('boat_train.txt', 'w')
+        file_valid = open('boat_valid.txt', 'w')
+        file_test = open('boat_boat.txt', 'w')
         for img in range(number_image):
             image_name = '0000000.ppm'
             c = list(image_name)
