@@ -36,19 +36,19 @@ def read_xywhi():
         file_vali = open('valid_boat.txt', 'w')
         file_test = open('test_boat.txt', 'w')
         for img in range(number_image):
+            image_name = '0000000.ppm'
+            c = list(image_name)
+            c[7 - len(str(img+1)):7] = str(img+1)
+            image_name = ''.join(c)
             if len((d['frames'])[img]['annotations']) == 0:
-                image_name = '0000000.ppm'
-                c = list(image_name)
-                c[7 - len(str(img)):7] = str(img)
-                image_name = ''.join(c)
                 if d['frames'][img]['num'] in train_num:
                     file_train.write('%s/dataset/%s' %(wd, image_name))  # TODO save dataset in folder dataset
                     file_train.write('\n')
                 elif d['frames'][img]['num'] in valid_num:
-                    file_train.write('%s/dataset/%s' % (wd, image_name))
-                    file_vali.write('\n')
+                    file_valid.write('%s/dataset/%s' % (wd, image_name))
+                    file_valid.write('\n')
                 elif d['frames'][img]['num'] in test_num:
-                    file_train.write('%s/dataset/%s' % (wd, image_name))
+                    file_test.write('%s/dataset/%s' % (wd, image_name))
                     file_test.write('\n')
             else:
                 for obj in range(len((d['frames'])[img]['annotations'])):
@@ -66,29 +66,26 @@ def read_xywhi():
                             file_train.write('%s/dataset/%s ' % (wd, image_name))
                             file_train.write(str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
                         elif d['frames'][img]['num'] in valid_num:
-                            file_train.write('%s/dataset/%s ' % (wd, image_name))
-                            file_vali.write(str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
+                            file_valid.write('%s/dataset/%s ' % (wd, image_name))
+                            file_valid.write(str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
                         elif d['frames'][img]['num'] in test_num:
-                            file_train.write('%s/dataset/%s ' % (wd, image_name))
+                            file_test.write('%s/dataset/%s ' % (wd, image_name))
                             file_test.write(str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
                     else:
                         if d['frames'][img]['num'] in train_num:
-                            file_train.write('%s/dataset/%s ' % (wd, image_name))
                             file_train.write(' ' + str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
                         elif d['frames'][img]['num'] in valid_num:
-                            file_train.write('%s/dataset/%s ' % (wd, image_name))
-                            file_vali.write(' ' + str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
+                            file_valid.write(' ' + str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
                         elif d['frames'][img]['num'] in test_num:
-                            file_train.write('%s/dataset/%s ' % (wd, image_name))
                             file_test.write(' ' + str(xmin) + ',' + str(ymin) + ',' + str(xmax) + ',' + str(ymax) + ',' + str(index))
                 if d['frames'][img]['num'] in train_num:
                     file_train.write('\n')
                 elif d['frames'][img]['num'] in valid_num:
-                    file_vali.write('\n')
+                    file_valid.write('\n')
                 elif d['frames'][img]['num'] in test_num:
                     file_test.write('\n')
         file_train.close()
-        file_vali.close()
+        file_valid.close()
         file_test.close()
 
 
