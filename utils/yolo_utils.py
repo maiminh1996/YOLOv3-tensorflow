@@ -28,13 +28,14 @@ def get_training_data(annotation_path, data_path, input_shape, max_boxes=100, lo
     :param annotation_path: path_to_image box1,box2,...,boxN with boxX: x_min,y_min,x_max,y_max,class_index
     :param data_path: saver at "/home/minh/stage/train.npz"
     :param input_shape: (416, 416)
-    :param max_boxes: 100: maximum number of an image
+    :param max_boxes: 100: maximum number objects of an image
     :param load_previous: for 2nd, 3th, .. using
     :return: image_data [N, 416, 416, 3] not yet normalized, N: number of image
              box_data: box format: [N, 100, 6], 100: maximum number of an image
                                                 6: top_left{x_min,y_min},bottom_right{x_max,y_max},class_index (no space)
+                                                /home/minh/keras-yolo3/VOCdevkit/VOC2007/JPEGImages/000012.jpg 156,97,351,270,6
     """
-    if load_previous==True and os.path.isfile(data_path):
+    if load_previous == True and os.path.isfile(data_path):
         data = np.load(data_path)
         print('Loading training data from ' + data_path)
         return data['image_data'], data['box_data'], data['image_shape']
@@ -45,29 +46,72 @@ def get_training_data(annotation_path, data_path, input_shape, max_boxes=100, lo
         for line in f.readlines():
             line = line.split(' ')
             filename = line[0]
+            if filename[-1] == '\n':
+                filename = filename[:-1]
             image = Image.open(filename)
-            boxed_image, shape_image = letterbox_image(image, tuple(reversed(input_shape)))
-            image_data.append(np.array(boxed_image, dtype='uint8'))
-            image_shape.append(np.array(shape_image, dtype='uint8'))
+            # For the case 2
+            # boxed_image, shape_image = letterbox_image(image, tuple(reversed(input_shape)))
+            # for the case 1
+            boxed_image, shape_image = resize_image(image, tuple(reversed(input_shape)))
+            image_data.append(np.array(boxed_image, dtype='uint8'))  # pixel: [0:255] uint8:[-128, 127]
+            image_shape.append(np.array(shape_image))
 
             boxes = np.zeros((max_boxes, 5), dtype='int32')
+            # correct the BBs to the image resize
+            if len(line)==1:  # if there is no object in this image
+                box_data.append(boxes)
             for i, box in enumerate(line[1:]):
                 if i < max_boxes:
                     boxes[i] = np.array(list(map(int, box.split(','))))
                 else:
                     break
-            image_size = np.array(image.size)
-            input_size = np.array(input_shape[::-1])
-            new_size = (image_size * np.min(input_size/image_size)).astype('int32')
-            boxes[:i+1, 0:2] = (boxes[:i+1, 0:2]*new_size/image_size + (input_size-new_size)/2).astype('int32')
-            boxes[:i+1, 2:4] = (boxes[:i+1, 2:4]*new_size/image_size + (input_size-new_size)/2).astype('int32')
-            box_data.append(boxes)
+                image_size = np.array(image.size)
+                input_size = np.array(input_shape[::-1])
+                # for case 2
+                # new_size = (image_size * np.min(input_size/image_size)).astype('int32')
+                # boxes[:i+1, 0:2] = (boxes[:i+1, 0:2]*new_size/image_size + (input_size-new_size)/2).astype('int32')
+                # boxes[:i+1, 2:4] = (boxes[:i+1, 2:4]*new_size/image_size + (input_size-new_size)/2).astype('int32')
+                # for case 1
+                boxes[:i + 1, 0] = (boxes[:i + 1, 0] * input_size[0] / image_size[0]).astype('int32')
+                boxes[:i + 1, 1] = (boxes[:i + 1, 1] * input_size[1] / image_size[1]).astype('int32')
+                boxes[:i + 1, 2] = (boxes[:i + 1, 2] * input_size[0] / image_size[0]).astype('int32')
+                boxes[:i + 1, 3] = (boxes[:i + 1, 3] * input_size[1] / image_size[1]).astype('int32')
+                box_data.append(boxes)
     image_shape = np.array(image_shape)
     image_data = np.array(image_data)
     box_data = np.array(box_data)
     np.savez(data_path, image_data=image_data, box_data=box_data, image_shape=image_shape)
     print('Saving training data into ' + data_path)
     return image_data, box_data, image_shape
+
+def letterbox_image(image, size):
+    """resize image with unchanged aspect ratio using padding
+    :param: size: input_shape
+    :return:boxed_image:
+            image_shape: original shape (h, w)
+    """
+    image_w, image_h = image.size
+    image_shape = np.array([image_h, image_w])
+    w, h = size
+    new_w = int(image_w * min(w/image_w, h/image_h))
+    new_h = int(image_h * min(w/image_w, h/image_h))
+    resized_image = image.resize((new_w, new_h), Image.BICUBIC)
+
+    boxed_image = Image.new('RGB', size, (128, 128, 128))
+    boxed_image.paste(resized_image, ((w-new_w)//2, (h-new_h)//2))
+    return boxed_image, image_shape
+
+def resize_image(image, size):
+    """
+    resize image with changed aspect ratio
+    :param image: origin image
+    :param size: input_shape
+    :return: origin_image_shape + image resize
+    """
+    image_w, image_h = image.size
+    image_shape = np.array([image_h, image_w])
+    image_resize = image.resize(size, Image.NEAREST)
+    return image_resize, image_shape
 
 
 def generate_colors(class_names):
@@ -136,17 +180,3 @@ def draw_boxes(image, out_scores, out_boxes, out_classes, class_names, colors):
         cv2.putText(image, label, (left, int(top - 4)), font_face, font_scale, (0, 0, 0), font_thickness, cv2.LINE_AA)
         
     return image
-
-
-def letterbox_image(image, size):
-    """resize image with unchanged aspect ratio using padding"""
-    image_w, image_h = image.size
-    image_shape = np.array([image_h, image_w])
-    w, h = size
-    new_w = int(image_w * min(w/image_w, h/image_h))
-    new_h = int(image_h * min(w/image_w, h/image_h))
-    resized_image = image.resize((new_w, new_h), Image.BICUBIC)
-
-    boxed_image = Image.new('RGB', size, (128, 128, 128))
-    boxed_image.paste(resized_image, ((w-new_w)//2, (h-new_h)//2))
-    return boxed_image, image_shape
