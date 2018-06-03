@@ -12,20 +12,20 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Get Data #############################################################################################################
 # Sua lai cho phu hop voi data cua minh#######
-classes_paths = '/home/minh/stage/model_data/coco_classes.txt'  # TODO
+classes_paths = './model_data/boat_classes.txt'  # TODO
 classes_data = read_classes(classes_paths)
 anchors_paths = '/home/minh/stage/model_data/yolo_anchors.txt'
 anchors = read_anchors(anchors_paths)
 # get data
-annotation_path_train = 'bateau_train.txt'  # TODO founir le fichier
-annotation_path_valid = 'bateau_valid.txt'  # TODO
-annotation_path_test = 'bateau_test.txt'  # TODO
+annotation_path_train = 'bateau_train.txt' 
+annotation_path_valid = 'bateau_valid.txt' 
+annotation_path_test = 'bateau_test.txt' 
 
 data_path_train = 'bateau_train.npz'
 data_path_valid = 'bateau_valid.npz'
 data_path_test = 'bateau_test.npz'
 log_dir = 'logs/000/'  # TODO change
-input_shape = (416, 416)  # multiple of 32
+input_shape = (Input_shape, Input_shape)  # multiple of 32
 image_data_train, box_data_train, image_shape_train = get_training_data(annotation_path_train, data_path_train,
                                                                         input_shape, max_boxes=100, load_previous=True)
 image_data_valid, box_data_valid, image_shape_valid = get_training_data(annotation_path_valid, data_path_valid,
@@ -105,7 +105,7 @@ with graph.as_default():
             start_time = time.time()
             for start, end in zip(range(0, number_image_train, batch_size), range(batch_size, number_image_train+1, batch_size)):
                 summary_train, _, loss_value = sess.run([summary_op, loss, optimizer],
-                                                        feed_dict={X: image_data_train[start:end],
+                                                        feed_dict={X: (image_data_train[start:end]/255.),
                                                                    S: image_shape_train[start:end],
                                                                    Y: box_data_train[start:end]})
                 # optimizer = tf.train.RMSPropOptimizer(learning_rate, decay).minimize(errors)
@@ -119,7 +119,7 @@ with graph.as_default():
                 sec_per_batch = float(duration)
                 # Run summaries and measure accuracy on validation set
                 summary_valid, loss_valid = sess.run([summary_op, loss],
-                                                     feed_dict={X: image_data_valid,
+                                                     feed_dict={X: (image_data_valid/255.),
                                                                 S: image_shape_valid,
                                                                 Y: box_data_valid})
                 validation_summary_writer.add_summary(summary_valid, epoch)
@@ -137,7 +137,7 @@ with graph.as_default():
         print("Tuning completed!")
         # Loss in test data set
         summary_test, loss_test = sess.run([summary_op, loss],
-                                           feed_dict={X: image_data_test,
+                                           feed_dict={X: (image_data_test/255.),
                                                       S: image_shape_test,
                                                       Y: box_data_test})
         print("Loss on test set: ", (100*loss_test))
