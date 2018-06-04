@@ -50,9 +50,9 @@ def get_training_data(annotation_path, data_path, input_shape, max_boxes=100, lo
                 filename = filename[:-1]
             image = Image.open(filename)
             # For the case 2
-            # boxed_image, shape_image = letterbox_image(image, tuple(reversed(input_shape)))
+            boxed_image, shape_image = letterbox_image(image, tuple(reversed(input_shape)))
             # for the case 1
-            boxed_image, shape_image = resize_image(image, tuple(reversed(input_shape)))
+            # boxed_image, shape_image = resize_image(image, tuple(reversed(input_shape)))
             image_data.append(np.array(boxed_image, dtype='uint8'))  # pixel: [0:255] uint8:[-128, 127]
             image_shape.append(np.array(shape_image))
 
@@ -68,14 +68,14 @@ def get_training_data(annotation_path, data_path, input_shape, max_boxes=100, lo
                 image_size = np.array(image.size)
                 input_size = np.array(input_shape[::-1])
                 # for case 2
-                # new_size = (image_size * np.min(input_size/image_size)).astype('int32')
-                # boxes[:i+1, 0:2] = (boxes[:i+1, 0:2]*new_size/image_size + (input_size-new_size)/2).astype('int32')
-                # boxes[:i+1, 2:4] = (boxes[:i+1, 2:4]*new_size/image_size + (input_size-new_size)/2).astype('int32')
+                new_size = (image_size * np.min(input_size/image_size)).astype('int32')
+                boxes[:i+1, 0:2] = (boxes[:i+1, 0:2]*new_size/image_size + (input_size-new_size)/2).astype('int32')
+                boxes[:i+1, 2:4] = (boxes[:i+1, 2:4]*new_size/image_size + (input_size-new_size)/2).astype('int32')
                 # for case 1
-                boxes[:i + 1, 0] = (boxes[:i + 1, 0] * input_size[0] / image_size[0]).astype('int32')
-                boxes[:i + 1, 1] = (boxes[:i + 1, 1] * input_size[1] / image_size[1]).astype('int32')
-                boxes[:i + 1, 2] = (boxes[:i + 1, 2] * input_size[0] / image_size[0]).astype('int32')
-                boxes[:i + 1, 3] = (boxes[:i + 1, 3] * input_size[1] / image_size[1]).astype('int32')
+                # boxes[:i + 1, 0] = (boxes[:i + 1, 0] * input_size[0] / image_size[0]).astype('int32')
+                # boxes[:i + 1, 1] = (boxes[:i + 1, 1] * input_size[1] / image_size[1]).astype('int32')
+                # boxes[:i + 1, 2] = (boxes[:i + 1, 2] * input_size[0] / image_size[0]).astype('int32')
+                # boxes[:i + 1, 3] = (boxes[:i + 1, 3] * input_size[1] / image_size[1]).astype('int32')
                 box_data.append(boxes)
     image_shape = np.array(image_shape)
     image_data = np.array(image_data)
