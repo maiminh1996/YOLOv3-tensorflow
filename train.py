@@ -117,29 +117,33 @@ with graph.as_default():
                 num_examples_per_step = np.shape(image_data_train)[0]
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = float(duration)
-                # Run summaries and measure accuracy on validation set
-                summary_valid, loss_valid = sess.run([summary_op, loss],
-                                                     feed_dict={X: (image_data_valid/255.),
-                                                                S: image_shape_valid,
-                                                                Y: box_data_valid})
+                for start, end in zip(range(0, number_image_train, batch_size),
+                                      range(batch_size, number_image_train + 1, batch_size)):
+                    # Run summaries and measure accuracy on validation set
+                    summary_valid, loss_valid = sess.run([summary_op, loss],
+                                                         feed_dict={X: (image_data_valid/255.),
+                                                                    S: image_shape_valid,
+                                                                    Y: box_data_valid})
                 validation_summary_writer.add_summary(summary_valid, epoch)
                 print(datetime.now(), "epoch", epoch, "accuracy=", 100*loss_valid, "(", examples_per_sec, "examples/sec;", sec_per_batch, "sec/batch)")
             # Saver the model checkpoint periodically
             if (epoch % 10) == 0:
-                create_new_folder = "./stage/saver_model"
+                create_new_folder = "/home/minh/stage/saver_model"
                 try:
                     os.mkdir(create_new_folder)
                 except OSError:
                     pass
-                checkpoint_path = create_new_folder + "/model" + str(epoch) + ".ckpt"
+                checkpoint_path = create_new_folder + "/model" + str(epoch) + ".ckpt"  # os.path.join()
                 saver.save(sess, checkpoint_path, global_step=epoch)
                 print("Model saved in file: %s" % checkpoint_path)
         print("Tuning completed!")
-        # Loss in test data set
-        summary_test, loss_test = sess.run([summary_op, loss],
-                                           feed_dict={X: (image_data_test/255.),
-                                                      S: image_shape_test,
-                                                      Y: box_data_test})
+        for start, end in zip(range(0, number_image_train, batch_size),
+                              range(batch_size, number_image_train + 1, batch_size)):
+            # Loss in test data set
+            summary_test, loss_test = sess.run([summary_op, loss],
+                                               feed_dict={X: (image_data_test/255.),
+                                                          S: image_shape_test,
+                                                          Y: box_data_test})
         print("Loss on test set: ", (100*loss_test))
 
 train_summary_writer.close()
