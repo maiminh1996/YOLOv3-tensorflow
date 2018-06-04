@@ -3,6 +3,7 @@ from network_function import YOLOv3
 from detect_function import predict
 from utils.yolo_utils import read_anchors, read_classes, letterbox_image
 
+from pathlib import Path
 from timeit import time
 from timeit import default_timer as timer  # to calculate FPS
 from PIL import Image, ImageFont, ImageDraw
@@ -60,11 +61,23 @@ class YOLO(object):
         # detect
         boxes, scores, classes = predict(scale_total, self.anchors, len(self.class_names), image_shape,
                                          score_threshold=self.threshold, iou_threshold=self.ignore_thresh)
-
+        
+        # Add ops to save and restore all the variables.
+        saver = tf.train.Saver()
+        
         writer = tf.summary.FileWriter('./graphs', tf.get_default_graph())
         # tensorboard --logdir="./graphs" --port 6006
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
+            epoch = 20
+            checkpoint = "/home/minh/stage/saver_model/model" + str(epoch) + ".ckpt"
+            try:
+                my_abs_path = Path(checkpoint).resolve()
+                saver.restore(sess, checkpoint)
+            except FileNotFoundError:
+                print("Not yet training!")
+            else:
+                print("already training!")
             out_boxes, out_scores, out_classes = sess.run([boxes, scores, classes], feed_dict={x: inputs})
 
         writer.close()
