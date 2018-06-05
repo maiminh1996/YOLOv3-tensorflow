@@ -7,7 +7,7 @@
 2. Transfomer the pre-trained weights in Darknet to keras (may be skip this etape to etape 3)
   <ul>
   <li>wget https://pjreddie.com/media/files/yolov3.weights </li>
-  <li>python3 convert.py yolov3.cfg yolov3.weights model_data/yolov3.h5</li>
+  <li>python3 convert.py yolov3.cfg yolov3.weights yolov3.h5</li>
   <li>python3 yolo.py </li>
   </ul>
   
