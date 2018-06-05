@@ -2,6 +2,9 @@
 > Build a real-time bounding-box object detection system for the boat (using fine-tuning in tensorflow based on YOLOv3-416 weights trained en COCO dataset). Then use my own data set for distinguish different type of boat 
 
 
+Inspired by https://github.com/allanzelener/YAD2K and https://github.com/qqwweee/keras-yolo3
+
+
 ## Test
 1. Clone this folder
 2. Transfomer the pre-trained weights in Darknet to keras (may be skip this etape to etape 3)
