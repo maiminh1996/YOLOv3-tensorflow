@@ -29,6 +29,6 @@
 2. Run python3 train.py
 3. In propagation.py, modify classes_path to boat_classes.txt
 4. Run python3 propagation.py
-5. Enjoy!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+5. Enjoy your results!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
