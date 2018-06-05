@@ -27,7 +27,7 @@ Inspired by https://github.com/allanzelener/YAD2K and https://github.com/qqwweee
 | ![608](https://i.imgur.com/d6wCvfx.jpg) | ![416](https://i.imgur.com/jL2gnXW.jpg) | ![320](https://i.imgur.com/XlOdq1N.jpg) |
 
 
-## Train
+## Train for your own dataset
 
 
 1. Run python3 boat_annotation.py to get 3 files: bateau_train.txt, bateau_valid.txt, bateau_test.txt
