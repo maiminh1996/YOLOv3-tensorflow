@@ -4,8 +4,16 @@
 
 ## Test
 1. Clone this folder
-2. Download the weights in keras from https://drive.google.com/open?id=1cVWJE1hv1M_KxzyJN6NE52L2JKqjW133
-3. Run python3 propagation.py 
+2. Transfomer the pre-trained weights in Darknet to keras
+  <ul>
+  <li>wget https://pjreddie.com/media/files/yolov3.weights</li>
+  <li>python3 convert.py yolov3.cfg yolov3.weights model_data/yolov3.h5</li>
+  </li>python3 yolo.py </li>
+  </ul>
+  
+  
+3. Or download the pre-trained weights in keras from https://drive.google.com/open?id=1cVWJE1hv1M_KxzyJN6NE52L2JKqjW133
+4. Run python3 propagation.py 
 
 
 **Results** (La Rochelle, la belle ville :) )
