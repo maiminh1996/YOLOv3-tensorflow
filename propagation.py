@@ -18,7 +18,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 class YOLO(object):
     def __init__(self):
         self.anchors_path = './model_data/yolo_anchors.txt'
-        self.classes_path = './model_data/coco_classes.txt'
+        self.classes_path = './model_data/coco_classes.txt'  # TODO modify to boat_classes.txt
         self.class_names = read_classes(self.classes_path)
         self.anchors = read_anchors(self.anchors_path)
         self.threshold = threshold
@@ -55,7 +55,7 @@ class YOLO(object):
         # image_shape = np.array([image.size[0], image.size[1]])  # tf.placeholder(tf.float32, shape=[2,])
 
         # Generate output tensor targets for filtered bounding boxes.
-        scale1, scale2, scale3 = YOLOv3(x, 80).feature_extractor()
+        scale1, scale2, scale3 = YOLOv3(x, len(self.class_names)).feature_extractor()
         scale_total = [scale1, scale2, scale3]
 
         # detect
@@ -69,7 +69,7 @@ class YOLO(object):
         # tensorboard --logdir="./graphs" --port 6006
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
-            epoch = 20
+            epoch = input('Entrer a check point at epoch(%10=0):')
             checkpoint = "/home/minh/stage/saver_model/model" + str(epoch) + ".ckpt"
             try:
                 my_abs_path = Path(checkpoint).resolve()
