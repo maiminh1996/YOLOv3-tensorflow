@@ -11,6 +11,9 @@ The full details are in this [paper](https://pjreddie.com/media/files/papers/YOL
 ##  Architecture
 
 
+Thank you [Ayoosh Kathuria](https://towardsdatascience.com/yolo-v3-object-detection-53fb7d3bfe6b) for your great image!
+
+
 ![Imgur](https://i.imgur.com/ToEbljZ.png)
 
 
