@@ -5,6 +5,17 @@
 Inspired by https://github.com/allanzelener/YAD2K and https://github.com/qqwweee/keras-yolo3
 
 
+## YOLO v3 Network Architecture
+
+
+![Imgur](https://i.imgur.com/Vam5Bz1.png)
+
+
+| Input to CCNs(Feature block) | General | Scales | Features |
+|------------------------------|------------|------------|
+| ![Imgur](https://i.imgur.com/BVWAq2e.png) | ![Imgur](https://i.imgur.com/7MKumGI.png) | ![Imgur](https://i.imgur.com/WfaG4Cw.png) | ![Imgur](https://i.imgur.com/C6DjsB9.jpg) |
+
+
 ## Test
 1. Clone this folder
 2. Transfomer the pre-trained weights in Darknet to keras (may be skip this etape to etape 3)
