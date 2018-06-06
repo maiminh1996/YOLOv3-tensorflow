@@ -19,7 +19,7 @@ Thank you [Ayoosh Kathuria](https://towardsdatascience.com/yolo-v3-object-detect
 
 | Input to CCNs(Features block) | General | 3 Scales | Features |
 |-------------------------------|---------|----------|--------- |
-| ![Imgur](https://i.imgur.com/BVWAq2e.png) | ![Imgur](https://i.imgur.com/7MKumGI.png) | ![Imgur](https://i.imgur.com/WfaG4Cw.png) | ![Imgur](https://i.imgur.com/C6DjsB9.jpg) |
+| ![Imgur](https://i.imgur.com/BVWAq2e.png) | ![Imgur](https://i.imgur.com/7MKumGI.png?1) | ![Imgur](https://i.imgur.com/WfaG4Cw.png) | ![Imgur](https://i.imgur.com/C6DjsB9.jpg) |
 
 
 ## Test
