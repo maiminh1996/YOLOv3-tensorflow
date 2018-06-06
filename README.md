@@ -8,7 +8,7 @@ Inspired by https://github.com/allanzelener/YAD2K and https://github.com/qqwweee
 ##  Architecture
 
 
-![Imgur](https://i.imgur.com/Vam5Bz1.png?1)
+![Imgur](https://i.imgur.com/ToEbljZ.png)
 
 
 | Input to CCNs(Features block) | General | 3 Scales | Features |
