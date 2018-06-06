@@ -3,6 +3,7 @@
 
 
 Inspired by https://github.com/allanzelener/YAD2K and https://github.com/qqwweee/keras-yolo3
+The full details are in this [paper](https://pjreddie.com/media/files/papers/YOLOv3.pdf)
 
 
 ##  Architecture
