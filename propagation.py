@@ -1,24 +1,28 @@
 from config import Input_shape, channels, threshold, ignore_thresh
 from network_function import YOLOv3
 from detect_function import predict
-from utils.yolo_utils import read_anchors, read_classes, letterbox_image
+from utils.yolo_utils import read_anchors, read_classes, letterbox_image, resize_image
 
+# from argparse import ArgumentParser
 from pathlib import Path
 from timeit import time
 from timeit import default_timer as timer  # to calculate FPS
 from PIL import Image, ImageFont, ImageDraw
 import tensorflow as tf
+import matplotlib.pyplot as plt
 import numpy as np
 import colorsys
 import random
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
 
 
 class YOLO(object):
     def __init__(self):
         self.anchors_path = './model_data/yolo_anchors.txt'
-        self.classes_path = './model_data/coco_classes.txt'  # TODO modify to boat_classes.txt
+        self.classes_path = './model_data/coco_classes.txt'
         self.class_names = read_classes(self.classes_path)
         self.anchors = read_anchors(self.anchors_path)
         self.threshold = threshold
@@ -41,9 +45,11 @@ class YOLO(object):
             assert self.INPUT_SIZE[0] % 32 == 0, 'Multiples of 32 required'
             assert self.INPUT_SIZE[1] % 32 == 0, 'Multiples of 32 required'
             boxed_image, image_shape = letterbox_image(image, tuple(reversed(self.INPUT_SIZE)))
+            # boxed_image, image_shape = resize_image(image, tuple(reversed(self.INPUT_SIZE)))
         else:
             new_image_size = (image.width - (image.width % 32), image.height - (image.height % 32))
             boxed_image, image_shape = letterbox_image(image, new_image_size)
+            # boxed_image, image_shape = resize_image(image, new_image_size)
         image_data = np.array(boxed_image, dtype='float32')
 
         print("heights, widths:", image_shape)
@@ -61,14 +67,15 @@ class YOLO(object):
         # detect
         boxes, scores, classes = predict(scale_total, self.anchors, len(self.class_names), image_shape,
                                          score_threshold=self.threshold, iou_threshold=self.ignore_thresh)
-        
+
         # Add ops to save and restore all the variables.
         saver = tf.train.Saver()
-        
+
         writer = tf.summary.FileWriter('./graphs', tf.get_default_graph())
         # tensorboard --logdir="./graphs" --port 6006
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
+            # Restore variables from disk.
             epoch = input('Entrer a check point at epoch(%10=0):')
             checkpoint = "/home/minh/stage/saver_model/model" + str(epoch) + ".ckpt"
             try:
@@ -78,6 +85,7 @@ class YOLO(object):
                 print("Not yet training!")
             else:
                 print("already training!")
+
             out_boxes, out_scores, out_classes = sess.run([boxes, scores, classes], feed_dict={x: inputs})
 
         writer.close()
@@ -166,3 +174,4 @@ def detect_img(yolo):
 
 if __name__ == '__main__':
     detect_img(YOLO())
+    # detect_video(YOLO(), 'video.mp4')
