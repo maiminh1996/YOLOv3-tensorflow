@@ -1,10 +1,8 @@
-# FUNCTION_PREDICT
+# Inférence
 import tensorflow as tf
-from config import *
-import numpy as np
+from config import Input_shape
 
-
-def yolo_head(feature_maps, anchors, num_classes, input_shape):
+def yolo_head(feature_maps, anchors, num_classes, input_shape, calc_loss=False):
     """
     Convert final layer features to bounding box parameters.
     (Features learned by the convolutional layers ---> a classifier/regressor which makes the detection prediction)
@@ -14,9 +12,7 @@ def yolo_head(feature_maps, anchors, num_classes, input_shape):
                                  [None, 52, 52, 255]                               [10, 13], [16, 30], [33, 23]
     :param anchors: 3 anchors for each scale shape=(3,2)
     :param num_classes: 80 for COCO
-    :param input_shape: scale1: (13,13) because scale1: stride=32 ---> 416/32=13
-                        scale2: (26,26), stride 16
-                        scale3: (52,52), stride 8
+    :param input_shape: 416,416
     :return: box_xy  [None, 13, 13, 3, 2], 2: x,y
              box_wh  [None, 13, 13, 3, 2], 2: w,h
              box_conf  [None, 13, 13, 3, 1], 1: conf
@@ -54,10 +50,14 @@ def yolo_head(feature_maps, anchors, num_classes, input_shape):
         instead we simply use independent logistic classifiers. 
             During training we use binary cross-entropy loss for the class predictions
         # for the relative width and weight, use the exponential function"""
-        box_xy = tf.nn.sigmoid(feature_maps_reshape[..., :2], name='x_y')  # [None, 13, 13, 3, 2]
+        box_xy = tf.sigmoid(feature_maps_reshape[..., :2], name='x_y')  # [None, 13, 13, 3, 2]
+        tf.summary.histogram(box_xy.op.name + '/activations', box_xy)
         box_wh = tf.exp(feature_maps_reshape[..., 2:4], name='w_h')  # [None, 13, 13, 3, 2]
+        tf.summary.histogram(box_wh.op.name + '/activations', box_wh)
         box_confidence = tf.sigmoid(feature_maps_reshape[..., 4:5], name='confidence')  # [None, 13, 13, 3, 1]
-        box_class_probs = tf.nn.sigmoid(feature_maps_reshape[..., 5:], name='class_probability')  # [None, 13, 13, 3, 80]
+        tf.summary.histogram(box_confidence.op.name + '/activations', box_confidence)
+        box_class_probs = tf.sigmoid(feature_maps_reshape[..., 5:], name='class_probs')  # [None, 13, 13, 3, 80]
+        tf.summary.histogram(box_class_probs.op.name + '/activations', box_class_probs)
         # Adjust predictions to each spatial grid point and anchor size.
         # Note: YOLO iterates over height index before width index.
         box_xy = (box_xy + grid) / tf.cast(grid_shape[::-1],  # (x,y + grid)/13. ---> in between (0., 1.)
@@ -65,6 +65,8 @@ def yolo_head(feature_maps, anchors, num_classes, input_shape):
         box_wh = box_wh * anchors_tensor / tf.cast(input_shape[::-1],  # following to the scale
                                                    dtype=feature_maps_reshape.dtype)  # [None, 13, 13, 3, 2]
 
+    if calc_loss == True:
+        return grid, feature_maps_reshape, box_xy, box_wh
     return box_xy, box_wh, box_confidence, box_class_probs
 
 
@@ -73,9 +75,7 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
     Convert YOLO box predictions to bounding box corners.(get corrected boxes)
     :param box_xy: (None, 13, 13, 3, 2) is box_x,y output of yolo_head()
     :param box_wh: (None, 13, 13, 3, 2) is box_w,h output of yolo_head()
-    :param input_shape: for scale1: (13,13) because scale1: stride=32 ---> 416/32=13
-                        for scale2: (26,26), stride 16
-                        for scale3: (52,52), stride 8
+    :param input_shape: 416,416
     :param image_shape: shape of input image (normal: height, width) . tf.placeholder(shape=(2, ))
     :return: box(2 corners) in original image shape (BB corresponding to h and w of image)
                         : 1 (y_min,x_min) left bottom corner
@@ -83,7 +83,7 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
                     ---> (..., (y_min,x_min,y_max,x_max)) (None, 13, 13, 3, 4)
     """
     # Note: YOLO iterates over height index before width index.
-    box_yx = box_xy[..., ::-1]  # (None, 13, 13, 3, 2) => ex: , x,y --> y,x 2--->[3,4],[5,6]--->[4,3],[6,5]
+    box_yx = box_xy[..., ::-1]  # (None, 13, 13, 3, 2) => ex: , x,y --> y,x
     box_hw = box_wh[..., ::-1]  # (None, 13, 13, 3, 2) w,h--->h,w
     input_shape = tf.cast(input_shape, dtype=box_yx.dtype)  # ex: (416,416)
     image_shape = tf.cast(image_shape, dtype=box_yx.dtype)  # ex: (720, 1028)
@@ -95,7 +95,7 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
         new_shape = image_shape * tf.minimum(constant[0], constant[1])  # 640*(416/640), 480*(416/640)
         new_shape = tf.round(new_shape)  # lam tron ---> (416, 312)
 
-    offset = (input_shape - new_shape) / 2. / input_shape  # 0,  (416-312)/2/416=0.125
+    offset = (input_shape - new_shape) / (input_shape*2.)  # 0,  (416-312)/2/416=0.125
     scale = input_shape / new_shape  # (1, 416/312)
 
     with tf.name_scope('return_corners_box'):
@@ -104,10 +104,10 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
         box_hw *= scale  # h*1, w*1.333
         box_mins = box_yx - (box_hw / 2.)  # (x-0)*1-h*1/2 = y_min, (y-0.125)*(416/312)-w*(416/312)/2 = x_min
         box_maxes = box_yx + (box_hw / 2.)  # (x-0)*1+h*1/2 = y_max, (y-0.125)*(416/312)+w*(416/312)/2 = x_max
-        boxes = tf.concat([box_mins[..., 1:2],  # y_min
-                           box_mins[..., 0:1],  # x_min
-                           box_maxes[..., 1:2],  # y_max
-                           box_maxes[..., 0:1]],  # x_max
+        boxes = tf.concat([box_mins[..., 0:1],  # y_min
+                           box_mins[..., 1:2],  # x_min
+                           box_maxes[..., 0:1],  # y_max
+                           box_maxes[..., 1:2]],  # x_max
                           axis=-1, name='box_in_scale')
         # Scale boxes back to original image shape,
         # y_min*height = 720*(x-0)*1-720*h*1/2
@@ -142,7 +142,7 @@ def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape)
     return boxes, box_scores
 
 
-def predict(yolo_outputs, anchors, num_classes, image_shape, max_boxes=20, score_threshold=.6, iou_threshold=.5):
+def predict(yolo_outputs, anchors, num_classes, image_shape, max_boxes=20, score_threshold=.3, iou_threshold=.5):
     """
     Evaluate YOLO model on given input and return filtered boxes
     :param yolo_outputs:
@@ -157,49 +157,55 @@ def predict(yolo_outputs, anchors, num_classes, image_shape, max_boxes=20, score
     # input_shape = tf.shape(yolo_outputs[0])[1:3] * 32  # scale1 13*32=416 [416,416]
     boxes = []
     box_scores = []
-    input_shape = np.array([416, 416])
+    input_shape = (Input_shape, Input_shape)
     anchor_mask = [[6, 7, 8], [3, 4, 5], [0, 1, 2]]
 
     for mask in range(3):  # 3 scale
-        _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[mask],
-                                                    anchors[anchor_mask[mask]],
-                                                    num_classes,
-                                                    input_shape,
-                                                    image_shape)
-        boxes.append(_boxes)  # list(3 array): [3, None*13*13*3, 4]
-        box_scores.append(_box_scores)  # list(3 array): [3, None*13*13*3, 80]
+        name = 'predict' + str(mask+1)
+        with tf.name_scope(name):
+            _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[mask],
+                                                        anchors[anchor_mask[mask]],
+                                                        num_classes,
+                                                        input_shape,
+                                                        image_shape)
+
+            boxes.append(_boxes)  # list(3 array): [3, None*13*13*3, 4]
+            box_scores.append(_box_scores)  # list(3 array): [3, None*13*13*3, 80]
 
     boxes = tf.concat(boxes, axis=0)  # [3 *None*13*13*3, 4]
     box_scores = tf.concat(box_scores, axis=0)  # [3 *None*13*13*3, 80]
 
     mask = box_scores >= score_threshold  # False & True in [3*None*13*13*3, 80] based on box_scores
     # maximum number of boxes to be selected by non max suppression
-    max_boxes_tensor = tf.constant(max_boxes, dtype='int32')
+    max_boxes_tensor = tf.constant(max_boxes, dtype='int32', name='max_boxes')
 
     boxes_ = []
     scores_ = []
     classes_ = []
 
     for Class in range(num_classes):
+        # name = 'Class'+str(Class)
+        # with tf.name_scope(name):
         class_boxes = tf.boolean_mask(boxes, mask[:, Class])  # obj:[3 *None*13*13*3, 4], mask:[3 *None*13*13*3, 1] ---> [..., 4], each class: keep boxes who have (box_scores >= score_threshold)
         class_box_scores = tf.boolean_mask(box_scores[:, Class], mask[:, Class])  # [..., 1]
 
         nms_index = tf.image.non_max_suppression(class_boxes,  # [num_box(True), 4]
                                                  class_box_scores,  # [num_box(True), 1]
                                                  max_boxes_tensor,  # 20
-                                                 iou_threshold=iou_threshold)  # return an integer tensor of indices has the shape [M], M <= 20
+                                                 iou_threshold=iou_threshold,
+                                                 name='non_max_suppression')  # return an integer tensor of indices has the shape [M], M <= 20
         class_boxes = tf.gather(class_boxes,
-                                nms_index)  # Take the elements of indices (nms_index) in the class_boxes. [M, 4]
-        class_box_scores = tf.gather(class_box_scores, nms_index)  # [M, 1]
-
-        classes = tf.ones_like(class_box_scores, 'int32') * Class  # [M, 1]
+                                nms_index, name='TopLeft_BottomRight')  # Take the elements of indices (nms_index) in the class_boxes. [M, 4]
+        class_box_scores = tf.gather(class_box_scores, nms_index, name='Box_score')  # [M, 1]
+        with tf.name_scope('Class_prob'):
+            classes = tf.ones_like(class_box_scores, 'int32') * Class  # [M, 1]
         boxes_.append(class_boxes)
         scores_.append(class_box_scores)
         classes_.append(classes)
 
-    boxes_ = tf.concat(boxes_, axis=0)  # [..., 4]
-    scores_ = tf.concat(scores_, axis=0)  # [..., 1]
-    classes_ = tf.concat(classes_, axis=0)  # [..., 1]
+    boxes_ = tf.concat(boxes_, axis=0, name='TopLeft_BottomRight')  # [N, 4] with N: number of objects
+    scores_ = tf.concat(scores_, axis=0)  # [N,]
+    classes_ = tf.concat(classes_, axis=0)  # [N,]
 
     return boxes_, scores_, classes_
 
