@@ -79,6 +79,17 @@ def compute_loss(YOLO_outputs, Y_true, anchors, num_classes, ignore_thresh=.5, p
         loss += xy_loss + wh_loss + confidence_loss + class_loss
         if print_loss:
             loss = tf.Print(loss, [loss, xy_loss, wh_loss, confidence_loss, class_loss, tf.keras.backend.sum(ignore_mask)], message='loss: ')  # TODO to tf
+
+        # box_loss = object_mask * tf.square(box_delta * box_delta_scale)
+
+        # confidence_loss = object_mask * tf.square(1 - pred_confidence) + \
+        #                   (1 - object_mask) * tf.square(0 - pred_confidence) * ignore_mask
+
+        # class_loss = object_mask * tf.square(true_class_probs - pred_class_probs)
+
+        # loss += np.sum(box_loss) + np.sum(confidence_loss) + np.sum(class_loss)
+
+    # loss = loss / tf.cast(m, dtype=loss.dtype)
     tf.summary.scalar("Loss", loss)
     return loss
 
