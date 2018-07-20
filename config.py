@@ -2,7 +2,7 @@
 # change the path to your project
 path = '/home/minh/PycharmProjects'
 # image pré-processing
-Input_shape = 416  # width=height # 608 or 320
+Input_shape = 416  # width=height # 608 or 416 or 320
 channels = 3  # RBG
 angle = 0
 saturation = 1.5
