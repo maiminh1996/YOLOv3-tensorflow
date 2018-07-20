@@ -53,10 +53,10 @@ def get_training_data(annotation_path, data_path, input_shape, anchors, num_clas
             boxed_image, shape_image = letterbox_image(image, tuple(reversed(input_shape)))
             # for the case 1
             # boxed_image, shape_image = resize_image(image, tuple(reversed(input_shape)))
-            image_data.append(np.array(boxed_image, dtype='uint8'))  # pixel: [0:255] uint8:[-128, 127]
+            image_data.append(np.array(boxed_image, dtype=np.uint8))  # pixel: [0:255] uint8:[-128, 127]
             image_shape.append(np.array(shape_image))
 
-            boxes = np.zeros((max_boxes, 5), dtype='int32')
+            boxes = np.zeros((max_boxes, 5), dtype=np.int32)
             # correct the BBs to the image resize
             if len(line)==1:  # if there is no object in this image
                 box_data.append(boxes)
@@ -68,10 +68,10 @@ def get_training_data(annotation_path, data_path, input_shape, anchors, num_clas
                 image_size = np.array(image.size)
                 input_size = np.array(input_shape[::-1])
                 # for case 2
-                new_size = (image_size * np.min(input_size/image_size)).astype('int32')
+                new_size = (image_size * np.min(input_size/image_size)).astype(np.int32)
                 # Correct BB to new image
-                boxes[i:i+1, 0:2] = (boxes[i:i+1, 0:2]*new_size/image_size + (input_size-new_size)/2).astype('int32')
-                boxes[i:i+1, 2:4] = (boxes[i:i+1, 2:4]*new_size/image_size + (input_size-new_size)/2).astype('int32')
+                boxes[i:i+1, 0:2] = (boxes[i:i+1, 0:2]*new_size/image_size + (input_size-new_size)/2).astype(np.int32)
+                boxes[i:i+1, 2:4] = (boxes[i:i+1, 2:4]*new_size/image_size + (input_size-new_size)/2).astype(np.int32)
                 # for case 1
                 # boxes[i:i + 1, 0] = (boxes[i:i + 1, 0] * input_size[0] / image_size[0]).astype('int32')
                 # boxes[i:i + 1, 1] = (boxes[i:i + 1, 1] * input_size[1] / image_size[1]).astype('int32')
