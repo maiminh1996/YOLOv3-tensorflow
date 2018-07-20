@@ -48,9 +48,6 @@ def yolo_head(feature_maps, anchors, num_classes, input_shape, calc_loss=False):
         # top of feature maps is a activation function
         """softmax is used for the multi-class logistic regression: ouput fall into [-1,1] ---> sum(all classes) = 1
         # sigmoid for the the 2-class logistic regression: output fall into [0,1] ---> sum(all classes) >1
-            We do not use a softmax as we have found it is unnecessary for good performance,
-        instead we simply use independent logistic classifiers. 
-            During training we use binary cross-entropy loss for the class predictions
         # for the relative width and weight, use the exponential function"""
         box_xy = tf.sigmoid(feature_maps_reshape[..., :2], name='x_y')  # [None, 13, 13, 3, 2]
         tf.summary.histogram(box_xy.op.name + '/activations', box_xy)
