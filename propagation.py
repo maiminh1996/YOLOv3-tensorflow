@@ -1,62 +1,249 @@
-import tensorflow as tf
+# from argparse import ArgumentParser
+import argparse
+import colorsys
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import random
+import sys
+from pathlib import Path
+from timeit import default_timer as timer  # to calculate FPS
+from timeit import time
+
+import numpy as np
+import tensorflow as tf
+from PIL import Image, ImageFont, ImageDraw
+from config import Input_shape, channels, threshold, ignore_thresh, path
+from network_function import YOLOv3
+
+from detect_function import predict
+from utils.yolo_utils import read_anchors, read_classes, letterbox_image  # , resize_image
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+# from tensorflow.python.client import device_lib
+# print(device_lib.list_local_devices())
 
 
-def W(number_conv):
-    import h5py
-    with h5py.File('/home/minh/stage/yolov3.h5', 'r') as f:
-        name = 'conv2d_' + str(number_conv)
-        w = f['model_weights'][name][name]['kernel:0']
-        weights = tf.cast(w, tf.float32)
-    return weights
 
+class YOLO(object):
+    def __init__(self):
 
-def B(number_conv):
-    global name
-    import h5py
-    with h5py.File('/home/minh/stage/yolov3.h5', 'r') as f:
-        if (number_conv == 59) or (number_conv == 67) or (number_conv == 75):
-            name = 'conv2d_' + str(number_conv)
-            b = f['model_weights'][name][name]['bias:0']
-            biases = tf.cast(b, tf.float32)
-            return biases
+        self.anchors_path = path + '/yolo3/model/yolo_anchors.txt'
+        self.COCO = False
+        self.trainable = True
+
+        args1 = sys.argv[2]
+        if args1=='COCO':
+            print("-----------COCO-----------")
+            self.COCO = True
+            self.classes_path = path + '/yolo3/model/coco_classes.txt'
+            self.trainable = False
+        elif args1=='VOC':
+            print("-----------VOC------------")
+            self.classes_path = path + '/yolo3/model/voc_classes.txt'
+        elif args1=='boat':
+            print("-----------boat-----------")
+            self.classes_path = path + '/yolo3/model/boat_classes.txt'
+
+        # args = self.argument()
+        # if args.COCO:
+        #     print("-----------COCO-----------")
+        #     self.COCO = True
+        #     self.classes_path = self.PATH + '/model/coco_classes.txt'
+        #     self.trainable = False
+        # elif args.VOC:
+        #     print("-----------VOC------------")
+        #     self.classes_path = self.PATH + '/model/voc_classes.txt'
+        # elif args.boat:
+        #     print("-----------boat-----------")
+        #     self.classes_path = self.PATH + '/model/boat_classes.txt'
+
+        self.class_names = read_classes(self.classes_path)
+        self.anchors = read_anchors(self.anchors_path)
+        self.threshold = threshold
+        self.ignore_thresh = ignore_thresh
+        self.INPUT_SIZE = (Input_shape, Input_shape)  # fixed size or (None, None)
+        self.is_fixed_size = self.INPUT_SIZE != (None, None)
+
+    @staticmethod
+    def argument():
+        parser = argparse.ArgumentParser(description='COCO or VOC or boat')
+        parser.add_argument('--COCO', action='store_true', help='COCO flag')
+        parser.add_argument('--VOC', action='store_true', help='VOC flag')
+        parser.add_argument('--boat', action='store_true', help='boat flag')
+        args = parser.parse_args()
+        return args
+
+    def detect_image(self, image):
+        # Remove nodes from graph or reset entire default graph
+        tf.reset_default_graph()
+        start = time.time()
+
+        # Generate colors for drawing bounding boxes.
+        hsv_tuples = [(x / len(self.class_names), 1., 1.) for x in range(len(self.class_names))]
+        self.colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+        self.colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), self.colors))
+        random.seed(10101)  # Fixed seed for consistent colors across runs.
+        random.shuffle(self.colors)  # Shuffle colors to decorrelate adjacent classes.
+        random.seed(None)  # Reset seed to default.
+
+        if self.is_fixed_size:
+            assert self.INPUT_SIZE[0] % 32 == 0, 'Multiples of 32 required'
+            assert self.INPUT_SIZE[1] % 32 == 0, 'Multiples of 32 required'
+            boxed_image, image_shape = letterbox_image(image, tuple(reversed(self.INPUT_SIZE)))
+            # boxed_image, image_shape = resize_image(image, tuple(reversed(self.INPUT_SIZE)))
         else:
-            if 68 <= number_conv <= 74:
-                name = 'batch_normalization_' + str(number_conv-2)
-            elif 66 >= number_conv >= 60:
-                name = 'batch_normalization_' + str(number_conv - 1)
-            elif 0 < number_conv <= 58:
-                name = 'batch_normalization_' + str(number_conv)
+            new_image_size = (image.width - (image.width % 32), image.height - (image.height % 32))
+            boxed_image, image_shape = letterbox_image(image, new_image_size)
+            # boxed_image, image_shape = resize_image(image, new_image_size)
+        image_data = np.array(boxed_image, dtype='float32')
 
-            beta = f['model_weights'][name][name]['beta:0']
-            beta = tf.cast(beta, tf.float32)
+        print("heights, widths:", image_shape)
+        image_data /= 255.
+        inputs = np.expand_dims(image_data, 0)  # Add batch dimension. #
 
-            gamma = f['model_weights'][name][name]['gamma:0']
-            gamma = tf.cast(gamma, tf.float32)
+        # Generate output tensor targets for filtered bounding boxes.
+        x = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, channels])
+        # image_shape = np.array([image.size[0], image.size[1]])  # tf.placeholder(tf.float32, shape=[2,])
 
-            moving_mean = f['model_weights'][name][name]['moving_mean:0']
-            moving_mean = tf.cast(moving_mean, tf.float32)
+        # Generate output tensor targets for filtered bounding boxes.
+        scale1, scale2, scale3 = YOLOv3(x, len(self.class_names), trainable=self.trainable).feature_extractor()
+        scale_total = [scale1, scale2, scale3]
 
-            moving_variance = f['model_weights'][name][name]['moving_variance:0']
-            moving_variance = tf.cast(moving_variance, tf.float32)
+        # detect
+        boxes, scores, classes = predict(scale_total, self.anchors, len(self.class_names), image_shape,
+                                         score_threshold=self.threshold, iou_threshold=self.ignore_thresh)
 
-            return moving_mean, moving_variance, beta, gamma
-"""
-with tf.Session() as sess:
+        # Add ops to save and restore all the variables
+        saver = tf.train.Saver(var_list=None if self.COCO==True else tf.trainable_variables())
 
-    a,b,c,d = B(74)
-    print(sess.run((a)))
-    print(sess.run(tf.shape(a)))
-    print(sess.run((b)))
-    print(sess.run(tf.shape(b)))
-    print(sess.run(c))
-    print(sess.run(tf.shape(c)))
-    # w = W(75)
-    # print(sess.run(w))
-    # print(sess.run(tf.shape(w)))
-    # d = B(75)
-    # print(sess.run(d))
-    # print(sess.run(tf.shape(d)))
-    sess.close()
-"""
+        # Allowing GPU memory growth
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        with tf.Session(config = config) as sess:
+            # initialize global variables in the graph
+            sess.run(tf.global_variables_initializer())
+            # Restore variables from disk.
+            epoch = input('Entrer a check point at epoch:')
+            # For the case of COCO
+            epoch = epoch if self.COCO==False else 2000
+            checkpoint = path + "/yolo3/save_model/SAVER_MODEL_boat1/model.ckpt-" + str(epoch)
+            try:
+                aaa = checkpoint + '.meta'
+                my_abs_path = Path(aaa).resolve()
+            except FileNotFoundError:
+                print("Not yet training!")
+            else:
+                saver.restore(sess, checkpoint)
+                print("checkpoint: ", checkpoint)
+                print("already training!")
+
+            out_boxes, out_scores, out_classes = sess.run([boxes, scores, classes], feed_dict={x: inputs})
+
+        print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
+
+        # Visualisation#################################################################################################
+        font = ImageFont.truetype(font=path + '/yolo3/model/font/FiraMono-Medium.otf', size=np.floor(3e-2 * image.size[1] + 0.5).astype(np.int32))
+        thickness = (image.size[0] + image.size[1]) // 500  # do day cua BB
+
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+            box = out_boxes[i]
+            score = out_scores[i]
+
+            label = '{} {:.2f}'.format(predicted_class, score)
+            draw = ImageDraw.Draw(image)
+            label_size = draw.textsize(label, font)
+
+            top, left, bottom, right = box  # y_min, x_min, y_max, x_max
+            top = max(0, np.floor(top + 0.5).astype(np.int32))
+            left = max(0, np.floor(left + 0.5).astype(np.int32))
+            bottom = min(image.size[1], np.floor(bottom + 0.5).astype(np.int32))
+            right = min(image.size[0], np.floor(right + 0.5).astype(np.int32))
+            print(label, (left, top), (right, bottom))  # (x_min, y_min), (x_max, y_max)
+
+            if top - label_size[1] >= 0:
+                text_origin = np.array([left, top - label_size[1]])
+            else:
+                text_origin = np.array([left, top + 1])
+
+            # My kingdom for a good redistributable image drawing library.
+            for j in range(thickness):
+                draw.rectangle([left + j, top + j, right - j, bottom - j], outline=self.colors[c])
+            draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=self.colors[c])
+            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+            del draw
+
+        end = time.time()
+        print(end - start)
+        return image
+
+
+def detect_video(yolo, video_path):
+    import cv2
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise IOError("Couldn't open webcam or video")
+    # The size of the frames to write
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # #Use whichever codec works for you...
+    fps = 15.0  # display fps frame per second
+    out = cv2.VideoWriter('output_video.avi', fourcc, fps, (w, h))
+    accum_time = 0
+    curr_fps = 0
+    fps = "FPS: ??"
+    prev_time = timer()
+    while True:
+        ret, frame = cap.read()
+        if ret==True:
+            image = Image.fromarray(frame)
+
+            image = yolo.detect_image(image)
+            result = np.asarray(image)
+
+            curr_time = timer()
+            exec_time = curr_time - prev_time
+            prev_time = curr_time
+            accum_time = accum_time + exec_time
+            curr_fps = curr_fps + 1
+            if accum_time > 1:
+                accum_time = accum_time - 1
+                fps = "FPS: " + str(curr_fps)
+                curr_fps = 0
+            cv2.putText(result, text=fps, org=(3, 15), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.50, color=(255, 0, 0), thickness=2)
+            cv2.namedWindow("Result", cv2.WINDOW_NORMAL)
+            cv2.imshow("Result", result)
+
+            out.write(result)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        else:
+            break
+    # Release everything if job is finished
+    cap.release()
+    out.release()
+    # Closes all the frames
+    cv2.destroyAllWindows()
+
+def detect_img(yolo):
+    while True:
+        img = input('Input image filename:')
+        try:
+            img = path + '/yolo3' + str(img)
+            image = Image.open(img)
+        except:
+            print('Open Error! Try again!')
+            continue
+        else:
+            r_image = yolo.detect_image(image)
+            r_image.show()
+
+
+if __name__ == '__main__':
+    choose = sys.argv[1]
+    if choose=='image':
+        detect_img(YOLO())
+    elif choose=='video':
+        video_path = sys.argv[3]
+        detect_video(YOLO(), video_path)

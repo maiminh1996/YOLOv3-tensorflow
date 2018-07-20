@@ -1,10 +1,11 @@
-from PIL import ImageFile
-from config import Input_shape, channels
-from network_function import YOLOv3
-
-from loss_function import compute_loss
 from utils.yolo_utils import get_training_data, read_anchors, read_classes
+from network_function import YOLOv3
+from loss_function import compute_loss
+from config import Input_shape, channels
+from datetime import datetime
 
+from pathlib import Path
+from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 import argparse
@@ -13,8 +14,6 @@ import tensorflow as tf
 import time
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,0"
-
-np.random.seed(101)
 
 # Add argument
 def argument():
@@ -25,53 +24,43 @@ def argument():
     args = parser.parse_args()
     return args
 # Get Data #############################################################################################################
-PATH = '/home/minh/PycharmProjects/yolo3'
-classes_paths = PATH + '/model/boat_classes.txt'
+classes_paths = './model_data/boat_classes.txt'
 classes_data = read_classes(classes_paths)
-anchors_paths = PATH + '/model/yolo_anchors.txt'
+anchors_paths = './model_data/yolo_anchors.txt'
 anchors = read_anchors(anchors_paths)
 
-annotation_path_train = PATH + '/model/boat_train.txt'
-annotation_path_valid = PATH + '/model/boat_valid.txt'
-annotation_path_test = PATH + '/model/boat_test.txt'
+annotation_path_train = './model_data/boat_train.txt'
+annotation_path_valid = './model_data/boat_valid.txt'
+annotation_path_test = './model_data/boat_test.txt'
 
-data_path_train = PATH + '/model/boat_train.npz'
-data_path_valid = PATH + '/model/boat_valid.npz'
-data_path_test = PATH + '/model/boat_test.npz'
+data_path_train = './model_data/boat_train.npz'
+data_path_valid = './model_data/boat_valid.npz'
+data_path_test = './model_data/boat_test.npz'
 VOC = False
 args = argument()
 if args.VOC == True:
     VOC = True
-    classes_paths = PATH + '/model/voc_classes.txt'
+    classes_paths = './model_data/voc_classes.txt'
     classes_data = read_classes(classes_paths)
-    annotation_path_train = PATH + '/model/voc_train.txt'
-    annotation_path_valid = PATH + '/model/voc_val.txt'
-    # annotation_path_test = PATH + '/model/voc_test.txt'
+    annotation_path_train = './model_data/voc_train.txt'
+    annotation_path_valid = './model_data/voc_val.txt'
+    # annotation_path_test = './model_data/voc_test.txt'
 
-    data_path_train = PATH + '/model/voc_train.npz'
-    data_path_valid = PATH + '/model/voc_valid.npz'
-    # data_path_test = PATH + '/model/voc_test.npz'
+    data_path_train = './model_data/voc_train.npz'
+    data_path_valid = './model_data/voc_valid.npz'
+    # data_path_test = './model_data/voc_test.npz'
 
 
 
 input_shape = (Input_shape, Input_shape)  # multiple of 32
 x_train, box_data_train, image_shape_train, y_train = get_training_data(annotation_path_train, data_path_train,
-                                                                        input_shape, anchors, num_classes=len(classes_data), max_boxes=20, load_previous=True)
-x_valid, box_data_valid, image_shape_valid, y_valid = get_training_data(annotation_path_valid, data_path_valid,
-                                                                        input_shape, anchors, num_classes=len(classes_data), max_boxes=20, load_previous=True)
-x_test, box_data_test, image_shape_test, y_test = get_training_data(annotation_path_test, data_path_test,
-                                                                    input_shape, anchors, num_classes=len(classes_data), max_boxes=20, load_previous=True)
+                                                                        input_shape, anchors, num_classes=len(classes_data), max_boxes=100, load_previous=True)
+
 number_image_train = np.shape(x_train)[0]
 print("number_image_train", number_image_train)
-number_image_valid = np.shape(x_valid)[0]
-print("number_image_valid", number_image_valid)
-number_image_test = np.shape(x_test)[0]
-print("number_image_test", number_image_test)
+X_train = x_train[5:6]
+Y_train = [y_train[0][5:6], y_train[1][5:6], y_train[2][5:6]]
 
-# import matplotlib.pyplot as plt
-#
-# plt.imshow(np.array(x_train[0]))
-# plt.show()
 # print(np.shape(y_train[0]))
 # print(np.shape(y_train[1]))
 # print(np.shape(y_train[2]))
@@ -84,7 +73,7 @@ print("Starting 1st session...")
 # Explicitly create a Graph object
 graph = tf.Graph()
 with graph.as_default():
-    # global_step = tf.Variable(0, name='global_step', trainable=True)
+    global_step = tf.Variable(0, name='global_step', trainable=False)
     # Start running operations on the Graph.
     # STEP 1: Input data ###############################################################################################
     with tf.name_scope("Input"):
@@ -100,14 +89,14 @@ with graph.as_default():
     # STEP 2: Building the graph #######################################################################################
     # Building the graph
     # Generate output tensor targets for filtered bounding boxes.
-    scale1, scale2, scale3 = YOLOv3(X, len(classes_data)).feature_extractor()
+    scale1, scale2, scale3 = YOLOv3(X, len(classes_data), trainable=False).feature_extractor()
     scale_total = [scale1, scale2, scale3]
 
     with tf.name_scope("Loss"):
         # Label
         y_predict = [Y1, Y2, Y3]
         # Calculate loss
-        loss = compute_loss(scale_total, y_predict, anchors, len(classes_data), print_loss=False)
+        loss = compute_loss(scale_total, y_predict, anchors, len(classes_data), print_loss=True)
         # loss_print = compute_loss(scale_total, y_predict, anchors, len(classes_data), print_loss=False)
         tf.summary.scalar("Loss", loss)
     with tf.name_scope("Optimizer"):
@@ -118,7 +107,7 @@ with graph.as_default():
         # learning_rate = 0.0002
         # decay = 0.0005
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
-        optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
+        # optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
         # optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate, decay=decay).minimize(loss)
         # optimizer = tf.train.MomentumOptimizer(learning_rate, 0.01).minimize(loss)
     # STEP 3: Build the evaluation step ################################################################################
@@ -129,7 +118,7 @@ with graph.as_default():
     # create a saver
     # saver = tf.train.Saver(tf.global_variables())
     # Returns all variables created with trainable=True
-    saver = tf.train.Saver(var_list=tf.trainable_variables())
+    # saver = tf.train.Saver(var_list=tf.trainable_variables())
     # saver = tf.train.Saver()
     # Build the summary operation based on the TF collection of Summaries
     # summary_op = tf.summary.merge_all()
@@ -145,19 +134,13 @@ with graph.as_default():
         summary_op = tf.summary.merge_all()
         # Summary Writers
         # tensorboard --logdir='./graphs/' --port 6005
-        if VOC==True:
-            train_summary_writer = tf.summary.FileWriter(PATH + '/graphs_VOC1/train', sess.graph)
-            validation_summary_writer = tf.summary.FileWriter(PATH + '/graphs_VOC1/validation', sess.graph)
-        else:
-            train_summary_writer = tf.summary.FileWriter(PATH + '/graphs_boat1/train', sess.graph)
-            validation_summary_writer = tf.summary.FileWriter(PATH + '/graphs_boat1/validation', sess.graph)
         # summary_writer = tf.summary.FileWriter('./graphs', sess.graph)
         sess.run(tf.global_variables_initializer())
         # If you want to continue training from check point
-        checkpoint = "/home/minh/PycharmProjects/yolo3/save_model/SAVER_MODEL_boat/model.ckpt-" + "3"
-        saver.restore(sess, checkpoint)
-        epochs = 100  #
-        batch_size = 8  # consider
+        # checkpoint = "/home/minh/PycharmProjects/yolo3/SAVER_MODEL_VOCK/model.ckpt-" + "3"
+        # saver.restore(sess, checkpoint)
+        epochs = 1#
+        batch_size = 1  # consider
         best_loss_valid = 10e6
         for epoch in range(epochs):
             start_time = time.time()
@@ -166,16 +149,16 @@ with graph.as_default():
             ## Training#################################################################################################
             mean_loss_train = []
             #for (start, end) in (zip((range(0, number_image_train, (batch_size))), (range(batch_size, number_image_train+1, batch_size)))):
-            for start in (range(0, number_image_train, batch_size)):
+            for start in (range(0, np.shape(X_train)[0], batch_size)):
                 end = start + batch_size
-                summary_train, loss_train, _ = sess.run([summary_op, loss, optimizer],
-                                                        feed_dict={X: (x_train[start:end]/255.),
-                                                                   Y1: y_train[0][start:end],
-                                                                   Y2: y_train[1][start:end],
-                                                                   Y3: y_train[2][start:end]})  # , options=run_options)
-                train_summary_writer.add_summary(summary_train, epoch)
+                loss_train = sess.run([loss],
+                                      feed_dict={X: (X_train[start:end] / 255.),
+                                                 Y1: Y_train[0][start:end],
+                                                 Y2: Y_train[1][start:end],
+                                                 Y3: Y_train[2][start:end]})  # , options=run_options)
+                # train_summary_writer.add_summary(summary_train, epoch)
                 # Flushes the event file to disk
-                train_summary_writer.flush()
+                # train_summary_writer.flush()
                 # summary_writer.add_summary(summary_train, counter)
                 mean_loss_train.append(loss_train)
                 print("(start: %s end: %s, \tepoch: %s)\tloss: %s " %(start, end, epoch + 1, loss_train))
@@ -185,36 +168,7 @@ with graph.as_default():
             duration = time.time() - start_time
             examples_per_sec = number_image_train / duration
             sec_per_batch = float(duration)
-            # Validation ###############################################################################################
-            mean_loss_valid = []
-            for start in (range(0, number_image_valid, batch_size)):
-                end = start + batch_size
-                # Run summaries and measure accuracy on validation set
-                summary_valid, loss_valid = sess.run([summary_op, loss],
-                                                    feed_dict={X: (x_valid[start:end]/255.),
-                                                                Y1: y_valid[0][start:end],
-                                                                Y2: y_valid[1][start:end],
-                                                                Y3: y_valid[2][start:end]})  # ,options=run_options)
-                validation_summary_writer.add_summary(summary_valid, epoch)
-                # Flushes the event file to disk
-                validation_summary_writer.flush()
-                mean_loss_valid.append(loss_valid)
-            mean_loss_valid = np.mean(mean_loss_valid)
-            print("epoch %s / %s \ttrain_loss: %s,\tvalid_loss: %s" %(epoch+1, epochs, mean_loss_train, mean_loss_valid))
 
-            if best_loss_valid > mean_loss_valid:
-                best_loss_valid = mean_loss_valid
-                if VOC ==True:
-                    create_new_folder = PATH + "/save_model/SAVER_MODEL_VOC55"
-                else:
-                    create_new_folder = PATH + "/save_model/SAVER_MODEL_boat1"
-                try:
-                    os.mkdir(create_new_folder)
-                except OSError:
-                    pass
-                checkpoint_path = create_new_folder + "/model.ckpt"
-                saver.save(sess, checkpoint_path, global_step=epoch)
-                print("Model saved in file: %s" % checkpoint_path)
         print("Tuning completed!")
 
         # Testing ######################################################################################################
@@ -234,6 +188,6 @@ with graph.as_default():
         # mean_loss_test = np.mean(mean_loss_test)
         # print("Mean loss in all of test set: ", mean_loss_test)
         # summary_writer.flush()
-        train_summary_writer.close()
-        validation_summary_writer.close()
+        # train_summary_writer.close()
+        # validation_summary_writer.close()
         # summary_writer.close()

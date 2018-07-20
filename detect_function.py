@@ -1,6 +1,8 @@
 # Inférence
 import tensorflow as tf
-from config import Input_shape
+
+from config import Input_shape, threshold, ignore_thresh
+
 
 def yolo_head(feature_maps, anchors, num_classes, input_shape, calc_loss=False):
     """
@@ -13,7 +15,7 @@ def yolo_head(feature_maps, anchors, num_classes, input_shape, calc_loss=False):
     :param anchors: 3 anchors for each scale shape=(3,2)
     :param num_classes: 80 for COCO
     :param input_shape: 416,416
-    :return: box_xy  [None, 13, 13, 3, 2], 2: x,y
+    :return: box_xy  [None, 13, 13, 3, 2], 2: x,y center point of BB
              box_wh  [None, 13, 13, 3, 2], 2: w,h
              box_conf  [None, 13, 13, 3, 1], 1: conf
              box_class_pred  [None, 13, 13, 3, 80], 80: prob of each class
@@ -69,7 +71,6 @@ def yolo_head(feature_maps, anchors, num_classes, input_shape, calc_loss=False):
         return grid, feature_maps_reshape, box_xy, box_wh
     return box_xy, box_wh, box_confidence, box_class_probs
 
-
 def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
     """
     Convert YOLO box predictions to bounding box corners.(get corrected boxes)
@@ -83,16 +84,32 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
                     ---> (..., (y_min,x_min,y_max,x_max)) (None, 13, 13, 3, 4)
     """
     # Note: YOLO iterates over height index before width index.
+    # batch_size = 3 #tf.shape(image_shape)[0]
     box_yx = box_xy[..., ::-1]  # (None, 13, 13, 3, 2) => ex: , x,y --> y,x
     box_hw = box_wh[..., ::-1]  # (None, 13, 13, 3, 2) w,h--->h,w
     input_shape = tf.cast(input_shape, dtype=box_yx.dtype)  # ex: (416,416)
+    # input_shape = tf.constant(Input_shape, shape=[batch_size, 2], dtype=box_yx.dtype)
     image_shape = tf.cast(image_shape, dtype=box_yx.dtype)  # ex: (720, 1028)
 
     with tf.name_scope('resize_to_scale_correspond'):
         """un image (640, 480) to scale1 (stride 32)(13x13)
         ---> new shape = (13, 10)"""
-        constant = (input_shape / image_shape)  # 416/640, 416/480
-        new_shape = image_shape * tf.minimum(constant[0], constant[1])  # 640*(416/640), 480*(416/640)
+        constant = (input_shape / image_shape)
+        # constant = tf.reshape((input_shape / image_shape), shape=[batch_size, 2])  # 416/640, 416/480
+        # min=[]
+        min = tf.minimum(constant[0], constant[1])
+        # for i in range(batch_size):
+        #     #i+=1
+        #     x = tf.minimum(constant[i][0], constant[i][1])
+        #     min.append(x)
+            #min = tf.concat([min, x], axis=0 )
+        # min = tf.stack(min)
+        # min = tf.reshape(min, shape=[batch_size, 1])
+        # min = (min.append(tf.minimum(constant[i][0], constant[i][1])) for i in range(batch_size))
+        # min = tf.cast([min[0], min[1], min[2]], dtype=constant.dtype)
+        # min = tf.reshape(min, shape=[batch_size, 2])
+
+        new_shape = image_shape * min  # 640*(416/640), 480*(416/640)
         new_shape = tf.round(new_shape)  # lam tron ---> (416, 312)
 
     offset = (input_shape - new_shape) / (input_shape*2.)  # 0,  (416-312)/2/416=0.125
@@ -142,7 +159,7 @@ def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape)
     return boxes, box_scores
 
 
-def predict(yolo_outputs, anchors, num_classes, image_shape, max_boxes=20, score_threshold=.3, iou_threshold=.5):
+def predict(yolo_outputs, anchors, num_classes, image_shape, max_boxes=20, score_threshold=threshold, iou_threshold=ignore_thresh):
     """
     Evaluate YOLO model on given input and return filtered boxes
     :param yolo_outputs:
