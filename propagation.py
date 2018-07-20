@@ -1,27 +1,21 @@
 # from argparse import ArgumentParser
-import argparse
-import colorsys
-import os
-import random
-import sys
-from pathlib import Path
-from timeit import default_timer as timer  # to calculate FPS
-from timeit import time
-
-import numpy as np
-import tensorflow as tf
 from PIL import Image, ImageFont, ImageDraw
 from config import Input_shape, channels, threshold, ignore_thresh, path
 from network_function import YOLOv3
-
 from detect_function import predict
 from utils.yolo_utils import read_anchors, read_classes, letterbox_image  # , resize_image
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+from timeit import default_timer as timer  # to calculate FPS
+from pathlib import Path
+import numpy as np
+import tensorflow as tf
+import argparse
+import colorsys
+import random
+import sys
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # from tensorflow.python.client import device_lib
 # print(device_lib.list_local_devices())
-
-
 
 class YOLO(object):
     def __init__(self):
@@ -58,10 +52,12 @@ class YOLO(object):
 
         self.class_names = read_classes(self.classes_path)
         self.anchors = read_anchors(self.anchors_path)
-        self.threshold = threshold
+        self.threshold = 0.5# threshold
         self.ignore_thresh = ignore_thresh
         self.INPUT_SIZE = (Input_shape, Input_shape)  # fixed size or (None, None)
         self.is_fixed_size = self.INPUT_SIZE != (None, None)
+        # LOADING SESSION...
+        self.boxes, self.scores, self.classes, self.sess = self.load()
 
     @staticmethod
     def argument():
@@ -71,12 +67,59 @@ class YOLO(object):
         parser.add_argument('--boat', action='store_true', help='boat flag')
         args = parser.parse_args()
         return args
-
-    def detect_image(self, image):
+    def load(self):
         # Remove nodes from graph or reset entire default graph
         tf.reset_default_graph()
-        start = time.time()
 
+        # Generate colors for drawing bounding boxes.
+        hsv_tuples = [(x / len(self.class_names), 1., 1.) for x in range(len(self.class_names))]
+        self.colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+        self.colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), self.colors))
+        random.seed(10101)  # Fixed seed for consistent colors across runs.
+        random.shuffle(self.colors)  # Shuffle colors to decorrelate adjacent classes.
+        random.seed(None)  # Reset seed to default.
+
+        # Generate output tensor targets for filtered bounding boxes.
+        self.x = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, channels])
+        self.image_shape = tf.placeholder(tf.float32, shape=[2,])
+        # self.is_training = tf.placeholder(tf.bool)
+        # image_shape = np.array([image.size[0], image.size[1]])  # tf.placeholder(tf.float32, shape=[2,])
+
+        # Generate output tensor targets for filtered bounding boxes.
+        # scale1, scale2, scale3 = YOLOv3(self.x, len(self.class_names), trainable=self.trainable, is_training=self.is_training).feature_extractor()
+        scale1, scale2, scale3 = YOLOv3(self.x, len(self.class_names), trainable=self.trainable).feature_extractor()
+        scale_total = [scale1, scale2, scale3]
+
+        # detect
+        boxes, scores, classes = predict(scale_total, self.anchors, len(self.class_names), self.image_shape,
+                                         score_threshold=self.threshold, iou_threshold=self.ignore_thresh)
+
+        # Add ops to save and restore all the variables
+        saver = tf.train.Saver(var_list=None if self.COCO==True else tf.trainable_variables())
+
+        # Allowing GPU memory growth
+
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        sess = tf.Session(config = config)
+        sess.run(tf.global_variables_initializer())
+        epoch = input('Entrer a check point at epoch:')
+        # For the case of COCO
+        epoch = epoch if self.COCO == False else 2000
+        checkpoint = path + "/yolo3/save_model/SAVER_MODEL_boat10/model.ckpt-" + str(epoch)
+        try:
+            aaa = checkpoint + '.meta'
+            my_abs_path = Path(aaa).resolve()
+        except FileNotFoundError:
+            print("Not yet training!")
+        else:
+            saver.restore(sess, checkpoint)
+            print("checkpoint: ", checkpoint)
+            print("already training!")
+
+        return boxes, scores, classes, sess
+
+    def detect_image(self, image):
         # Generate colors for drawing bounding boxes.
         hsv_tuples = [(x / len(self.class_names), 1., 1.) for x in range(len(self.class_names))]
         self.colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
@@ -100,43 +143,11 @@ class YOLO(object):
         image_data /= 255.
         inputs = np.expand_dims(image_data, 0)  # Add batch dimension. #
 
-        # Generate output tensor targets for filtered bounding boxes.
-        x = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, channels])
-        # image_shape = np.array([image.size[0], image.size[1]])  # tf.placeholder(tf.float32, shape=[2,])
-
-        # Generate output tensor targets for filtered bounding boxes.
-        scale1, scale2, scale3 = YOLOv3(x, len(self.class_names), trainable=self.trainable).feature_extractor()
-        scale_total = [scale1, scale2, scale3]
-
-        # detect
-        boxes, scores, classes = predict(scale_total, self.anchors, len(self.class_names), image_shape,
-                                         score_threshold=self.threshold, iou_threshold=self.ignore_thresh)
-
-        # Add ops to save and restore all the variables
-        saver = tf.train.Saver(var_list=None if self.COCO==True else tf.trainable_variables())
-
-        # Allowing GPU memory growth
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        with tf.Session(config = config) as sess:
-            # initialize global variables in the graph
-            sess.run(tf.global_variables_initializer())
-            # Restore variables from disk.
-            epoch = input('Entrer a check point at epoch:')
-            # For the case of COCO
-            epoch = epoch if self.COCO==False else 2000
-            checkpoint = path + "/yolo3/save_model/SAVER_MODEL_boat1/model.ckpt-" + str(epoch)
-            try:
-                aaa = checkpoint + '.meta'
-                my_abs_path = Path(aaa).resolve()
-            except FileNotFoundError:
-                print("Not yet training!")
-            else:
-                saver.restore(sess, checkpoint)
-                print("checkpoint: ", checkpoint)
-                print("already training!")
-
-            out_boxes, out_scores, out_classes = sess.run([boxes, scores, classes], feed_dict={x: inputs})
+        out_boxes, out_scores, out_classes = self.sess.run([self.boxes, self.scores, self.classes],
+                                                           feed_dict={self.x: inputs,
+                                                                      self.image_shape: image_shape,
+                                                                      # self.is_training: False
+                                                                      })
 
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
@@ -171,32 +182,29 @@ class YOLO(object):
             draw.rectangle([tuple(text_origin), tuple(text_origin + label_size)], fill=self.colors[c])
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
-
-        end = time.time()
-        print(end - start)
         return image
 
-
-def detect_video(yolo, video_path):
+def detect_video(yolo, video_path=None, output_video=None):
+    import urllib.request as urllib
     import cv2
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise IOError("Couldn't open webcam or video")
-    # The size of the frames to write
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # #Use whichever codec works for you...
-    fps = 15.0  # display fps frame per second
-    out = cv2.VideoWriter('output_video.avi', fourcc, fps, (w, h))
+
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    fps = 20.0  # display fps frame per second
     accum_time = 0
     curr_fps = 0
-    fps = "FPS: ??"
     prev_time = timer()
-    while True:
-        ret, frame = cap.read()
-        if ret==True:
-            image = Image.fromarray(frame)
+    if video_path=='stream':
+        url = 'http://10.18.97.1:8080/shot.jpg'
+        out = cv2.VideoWriter(output_video, fourcc, fps, (1280, 720))
+        while True:
 
+            # Use urllib to get the image and convert into a cv2 usable format
+            imgResp = urllib.urlopen(url)
+            imgNp = np.array(bytearray(imgResp.read()), dtype=np.uint8)
+            img = cv2.imdecode(imgNp, -1)
+            # print(np.shape(img))  # get w, h from here
+
+            image = Image.fromarray(img)
             image = yolo.detect_image(image)
             result = np.asarray(image)
 
@@ -211,22 +219,64 @@ def detect_video(yolo, video_path):
                 curr_fps = 0
             cv2.putText(result, text=fps, org=(3, 15), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=0.50, color=(255, 0, 0), thickness=2)
-            cv2.namedWindow("Result", cv2.WINDOW_NORMAL)
+            # cv2.namedWindow("result", cv2.WINDOW_NORMAL)
             cv2.imshow("Result", result)
-
             out.write(result)
+
+            # To give the processor some less stress
+            # time.sleep(0.1)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-        else:
-            break
-    # Release everything if job is finished
-    cap.release()
-    out.release()
-    # Closes all the frames
-    cv2.destroyAllWindows()
+        out.release()
+        # Closes all the frames
+        cv2.destroyAllWindows()
 
-def detect_img(yolo):
+        yolo.sess.close()
+    else:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise IOError("Couldn't open webcam or video")
+        # The size of the frames to write
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        out = cv2.VideoWriter(output_video, fourcc, fps, (w, h))
+        while True:
+            ret, frame = cap.read()
+            if ret==True:
+                image = Image.fromarray(frame)
+
+                image = yolo.detect_image(image)
+                result = np.asarray(image)
+
+                curr_time = timer()
+                exec_time = curr_time - prev_time
+                prev_time = curr_time
+                accum_time = accum_time + exec_time
+                curr_fps = curr_fps + 1
+                if accum_time > 1:
+                    accum_time = accum_time - 1
+                    fps = "FPS: " + str(curr_fps)
+                    curr_fps = 0
+                cv2.putText(result, text=fps, org=(3, 15), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                            fontScale=0.50, color=(255, 0, 0), thickness=2)
+                cv2.namedWindow("Result", cv2.WINDOW_NORMAL)
+                cv2.imshow("Result", result)
+
+                out.write(result)
+
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            else:
+                break
+        cap.release()
+        out.release()
+        # Closes all the frames
+        cv2.destroyAllWindows()
+
+        yolo.sess.close()
+
+def detect_img(yolo, output=''):
     while True:
         img = input('Input image filename:')
         try:
@@ -237,13 +287,18 @@ def detect_img(yolo):
             continue
         else:
             r_image = yolo.detect_image(image)
+            r_image.save(output)
             r_image.show()
+
+    yolo.sess.close()
 
 
 if __name__ == '__main__':
     choose = sys.argv[1]
     if choose=='image':
-        detect_img(YOLO())
+        output = sys.argv[3]
+        detect_img(YOLO(), output)
     elif choose=='video':
         video_path = sys.argv[3]
-        detect_video(YOLO(), video_path)
+        output = sys.argv[4]
+        detect_video(YOLO(), video_path, output)
