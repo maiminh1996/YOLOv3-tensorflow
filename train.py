@@ -1,10 +1,10 @@
-from PIL import ImageFile
-from config import Input_shape, channels
+from config import Input_shape, channels, path
 from network_function import YOLOv3
 
 from loss_function import compute_loss
 from utils.yolo_utils import get_training_data, read_anchors, read_classes
 
+from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 import argparse
@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 np.random.seed(101)
 
@@ -25,7 +25,7 @@ def argument():
     args = parser.parse_args()
     return args
 # Get Data #############################################################################################################
-PATH = '/home/minh/PycharmProjects/yolo3'
+PATH = path + '/yolo3'
 classes_paths = PATH + '/model/boat_classes.txt'
 classes_data = read_classes(classes_paths)
 anchors_paths = PATH + '/model/yolo_anchors.txt'
@@ -84,11 +84,11 @@ print("Starting 1st session...")
 # Explicitly create a Graph object
 graph = tf.Graph()
 with graph.as_default():
-    # global_step = tf.Variable(0, name='global_step', trainable=True)
+    global_step = tf.Variable(0, name='global_step', trainable=False)
     # Start running operations on the Graph.
     # STEP 1: Input data ###############################################################################################
-    with tf.name_scope("Input"):
-        X = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, channels], name='Input')  # for image_data
+
+    X = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, channels], name='Input')  # for image_data
     with tf.name_scope("Target"):
         Y1 = tf.placeholder(tf.float32, shape=[None, Input_shape/32, Input_shape/32, 3, (5+len(classes_data))], name='target_S1')
         Y2 = tf.placeholder(tf.float32, shape=[None, Input_shape/16, Input_shape/16, 3, (5+len(classes_data))], name='target_S2')
@@ -103,7 +103,7 @@ with graph.as_default():
     scale1, scale2, scale3 = YOLOv3(X, len(classes_data)).feature_extractor()
     scale_total = [scale1, scale2, scale3]
 
-    with tf.name_scope("Loss"):
+    with tf.name_scope("Loss_and_Detect"):
         # Label
         y_predict = [Y1, Y2, Y3]
         # Calculate loss
@@ -113,12 +113,10 @@ with graph.as_default():
     with tf.name_scope("Optimizer"):
         # optimizer
         # for VOC: lr:0.0001, decay:0.0003 with RMSProOp after 60 epochs
-        learning_rate = 0.0001
+        # learning_rate = tf.placeholder(tf.float32, shape=[1], name='lr')
         decay = 0.0003
-        # learning_rate = 0.0002
-        # decay = 0.0005
         # optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
-        optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(loss, global_step=global_step)
         # optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate, decay=decay).minimize(loss)
         # optimizer = tf.train.MomentumOptimizer(learning_rate, 0.01).minimize(loss)
     # STEP 3: Build the evaluation step ################################################################################
@@ -129,8 +127,8 @@ with graph.as_default():
     # create a saver
     # saver = tf.train.Saver(tf.global_variables())
     # Returns all variables created with trainable=True
-    saver = tf.train.Saver(var_list=tf.trainable_variables())
-    # saver = tf.train.Saver()
+    # saver = tf.train.Saver(var_list=tf.trainable_variables())
+    saver = tf.train.Saver()
     # Build the summary operation based on the TF collection of Summaries
     # summary_op = tf.summary.merge_all()
 
@@ -138,7 +136,7 @@ with graph.as_default():
     # The Graph to be launched (described above)
     # config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=True) #, gpu_options.allow_growth = False)
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = False
+    config.gpu_options.allow_growth = True
     # run_options = tf.RunOptions(report_tensor_allocations_upon_oom = True)
     with tf.Session(config=config, graph=graph) as sess:
         # Merges all summaries collected in the default graph
@@ -149,15 +147,15 @@ with graph.as_default():
             train_summary_writer = tf.summary.FileWriter(PATH + '/graphs_VOC1/train', sess.graph)
             validation_summary_writer = tf.summary.FileWriter(PATH + '/graphs_VOC1/validation', sess.graph)
         else:
-            train_summary_writer = tf.summary.FileWriter(PATH + '/graphs_boat1/train', sess.graph)
-            validation_summary_writer = tf.summary.FileWriter(PATH + '/graphs_boat1/validation', sess.graph)
+            train_summary_writer = tf.summary.FileWriter(PATH + '/graphs_boat10/train', sess.graph)
+            validation_summary_writer = tf.summary.FileWriter(PATH + '/graphs_boat10/validation', sess.graph)
         # summary_writer = tf.summary.FileWriter('./graphs', sess.graph)
         sess.run(tf.global_variables_initializer())
         # If you want to continue training from check point
-        checkpoint = "/home/minh/PycharmProjects/yolo3/save_model/SAVER_MODEL_boat/model.ckpt-" + "3"
-        saver.restore(sess, checkpoint)
-        epochs = 100  #
-        batch_size = 8  # consider
+        # checkpoint = "/home/minh/PycharmProjects/yolo3/save_model/SAVER_MODEL_boatM/model.ckpt-" + "1"
+        # saver.restore(sess, checkpoint)
+        epochs = 50  #
+        batch_size = 32  # consider
         best_loss_valid = 10e6
         for epoch in range(epochs):
             start_time = time.time()
@@ -192,9 +190,9 @@ with graph.as_default():
                 # Run summaries and measure accuracy on validation set
                 summary_valid, loss_valid = sess.run([summary_op, loss],
                                                     feed_dict={X: (x_valid[start:end]/255.),
-                                                                Y1: y_valid[0][start:end],
-                                                                Y2: y_valid[1][start:end],
-                                                                Y3: y_valid[2][start:end]})  # ,options=run_options)
+                                                               Y1: y_valid[0][start:end],
+                                                               Y2: y_valid[1][start:end],
+                                                               Y3: y_valid[2][start:end]})  # ,options=run_options)
                 validation_summary_writer.add_summary(summary_valid, epoch)
                 # Flushes the event file to disk
                 validation_summary_writer.flush()
@@ -205,9 +203,9 @@ with graph.as_default():
             if best_loss_valid > mean_loss_valid:
                 best_loss_valid = mean_loss_valid
                 if VOC ==True:
-                    create_new_folder = PATH + "/save_model/SAVER_MODEL_VOC55"
+                    create_new_folder = PATH + "/save_model/SAVER_MODEL_VOC1"
                 else:
-                    create_new_folder = PATH + "/save_model/SAVER_MODEL_boat1"
+                    create_new_folder = PATH + "/save_model/SAVER_MODEL_boat10"
                 try:
                     os.mkdir(create_new_folder)
                 except OSError:
@@ -215,6 +213,7 @@ with graph.as_default():
                 checkpoint_path = create_new_folder + "/model.ckpt"
                 saver.save(sess, checkpoint_path, global_step=epoch)
                 print("Model saved in file: %s" % checkpoint_path)
+
         print("Tuning completed!")
 
         # Testing ######################################################################################################
@@ -237,3 +236,6 @@ with graph.as_default():
         train_summary_writer.close()
         validation_summary_writer.close()
         # summary_writer.close()
+
+
+
