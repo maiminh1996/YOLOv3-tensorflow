@@ -7,7 +7,7 @@ Inspired by [YAD2K](https://github.com/allanzelener/YAD2K), [Darknet](https://gi
 
 The full details are in this [paper](https://pjreddie.com/media/files/papers/YOLOv3.pdf)
 
-
+<!--
 ##  Architecture
 
 
@@ -15,7 +15,7 @@ Thank you [Ayoosh Kathuria](https://towardsdatascience.com/yolo-v3-object-detect
 
 
 ![Imgur](https://i.imgur.com/ToEbljZ.png)
-
+-->
 
 | Input to CCNs(Features block) | General | 3 Scales | Features |
 |-------------------------------|---------|----------|--------- |
