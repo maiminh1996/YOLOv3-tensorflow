@@ -20,7 +20,7 @@ class YOLOv3(object):
         """
         self.X = x
         self.NUM_CLASSES = num_classes
-        self.train=trainable
+        self.is_training=trainable
         # self.is_training=is_training
         # self.ST = False
         # if strategie_training==1:
@@ -145,7 +145,7 @@ class YOLOv3(object):
                 conv_56 = self.conv2d(conv_55, 56)
                 conv_57 = self.conv2d(conv_56, 57)
                 conv_58 = self.conv2d(conv_57, 58)  # [None,13 ,13,1024]
-                conv_59 = self.conv2d(conv_58, 59, batch_norm_and_activation=False, trainable=self.train)
+                conv_59 = self.conv2d(conv_58, 59, batch_norm_and_activation=False, trainable=self.is_training)
                 # [yolo layer] 6,7,8 # 82  --->predict    scale:1, stride:32, detecting large objects => mask: 6,7,8
                 # 13x13x255, 255=3*(80+1+4)
             with tf.name_scope('scale_2'):
@@ -159,7 +159,7 @@ class YOLOv3(object):
                 conv_64 = self.conv2d(conv_63, 64)
                 conv_65 = self.conv2d(conv_64, 65)
                 conv_66 = self.conv2d(conv_65, 66)
-                conv_67 = self.conv2d(conv_66, 67, batch_norm_and_activation=False, trainable=self.train)
+                conv_67 = self.conv2d(conv_66, 67, batch_norm_and_activation=False, trainable=self.is_training)
                 # [yolo layer] 3,4,5 # 94  --->predict   scale:2, stride:16, detecting medium objects => mask: 3,4,5
                 # 26x26x255, 255=3*(80+1+4)
             with tf.name_scope('scale_3'):
@@ -173,7 +173,7 @@ class YOLOv3(object):
                 conv_72 = self.conv2d(conv_71, 72)
                 conv_73 = self.conv2d(conv_72, 73)
                 conv_74 = self.conv2d(conv_73, 74)
-                conv_75 = self.conv2d(conv_74, 75, batch_norm_and_activation=False, trainable=self.train)
+                conv_75 = self.conv2d(conv_74, 75, batch_norm_and_activation=False, trainable=self.is_training)
                 # [yolo layer] 0,1,2 # 106 --predict scale:3, stride:8, detecting the smaller objects => mask: 0,1,2
                 # 52x52x255, 255=3*(80+1+4)
                 # Bounding Box:  YOLOv2: 13x13x5
@@ -259,10 +259,12 @@ class YOLOv3(object):
                     tf.summary.histogram(name_beta, beta)  # add summary
                     gamma = tf.Variable(gamma, trainable=tous, dtype=tf.float32, name="gamma")
                     tf.summary.histogram(name_gam, gamma)  # add summary
-                    conv = tf.nn.batch_normalization(conv, moving_mean, moving_variance, beta, gamma,
-                                                     variance_epsilon, name='BatchNorm')
+                    # conv = tf.nn.batch_normalization(conv, moving_mean, moving_variance, beta, gamma,
+                    #                                 variance_epsilon, name='BatchNorm')
                     # conv = tf.nn.batch_normalization(conv, mean, var, beta, gamma,
                     #                                  variance_epsilon, name='BatchNorm')
+                    conv = tf.layers.batch_normalization(moving_mean_initializer=moving_mean, moving_variance_initializer=moving_variance,
+                                                         beta_initializer=beta, gamma_initializer=gamma, training=self.is_training)
                 with tf.name_scope('Activation'):
                     alpha = tf.constant(0.1, name="alpha")  # Slope of the activation function at x < 0
                     acti = tf.maximum(alpha * conv, conv)

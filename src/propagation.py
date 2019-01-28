@@ -22,7 +22,7 @@ class YOLO(object):
 
         self.anchors_path = path + '/yolo3/model/yolo_anchors.txt'
         self.COCO = False
-        self.trainable = True
+        self.trainable = False
 
         args1 = sys.argv[2]
         if args1=='COCO':
@@ -81,7 +81,7 @@ class YOLO(object):
 
         # Generate output tensor targets for filtered bounding boxes.
         self.x = tf.placeholder(tf.float32, shape=[None, Input_shape, Input_shape, channels])
-        self.image_shape = tf.placeholder(tf.float32, shape=[2,])
+        self.image_shape = tf.placeholder(tf.float32, shape=[2, ])
         # self.is_training = tf.placeholder(tf.bool)
         # image_shape = np.array([image.size[0], image.size[1]])  # tf.placeholder(tf.float32, shape=[2,])
 
